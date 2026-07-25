@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude
+.claude/
+
+# Phase 2 (Swift) build artifacts — reserved for later
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+.build/
