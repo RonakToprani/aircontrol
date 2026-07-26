@@ -15,11 +15,8 @@ Uses [MediaPipe Hands](https://developers.google.com/mediapipe) (JS/WASM) for 21
 ### What it does
 - Live webcam feed with a custom canvas cursor overlay (no OS cursor involved).
 - **Pinch** (thumb tip ↔ index tip, normalized by hand size so it works at any distance) to grab and drag mock windows; release to drop. The grab point stays fixed relative to the window.
-- **Two swipe gestures, disambiguated by the thumb** (like the native trackpad feel):
-  - **4 fingers, thumb tucked → page swipe** — switch Space, windows stay put (green feedback).
-  - **All 5 fingers, thumb splayed → window swipe** — carry the focused window across to the adjacent Space (blue feedback).
-
-  Detection is **displacement-over-a-time-window** (the hand must travel a set distance within N ms), not instantaneous velocity — robust to frame-rate and brief tracking dropouts, and it won't false-trigger on slow drift. A live progress bar + finger/thumb readout shows which gesture is arming.
+- **Four-finger swipe** left/right switches between windows/Spaces. Detection is **displacement-over-a-time-window** (four fingers must travel a set distance within N ms), not instantaneous velocity — robust to frame-rate and brief tracking dropouts, and it won't false-trigger on slow drift. A live progress bar + finger-count readout shows the gesture arming.
+- **Smooth motion by design.** The cursor and any dragged window are eased toward the latest hand position **every render frame (~60fps)**, decoupled from the slower, variable camera detection rate — so dragging glides instead of stepping. Grabbed windows get a subtle lift/shadow animation on pickup and drop.
 - **EMA smoothing** on both cursor position and the pinch signal, with pinch **hysteresis** to stop threshold flicker.
 - **Coordinate mapping** from normalized webcam space to screen space with a configurable edge margin (dead-zone), so you never have to reach the literal frame edge.
 - Cursor states — idle ring → hover highlight → filled pinch dot — with smooth animated transitions, plus a targeting-style highlight border on the window about to be grabbed (previews the real Phase 2 behavior).
@@ -32,6 +29,8 @@ Keyboard: `H` toggles help · `P` toggles the tuning panel.
 
 ### Tuning constants
 All defaults live in one place — the `DEFAULTS` object at the top of the `<script>` in `phase1/index.html` — and each is bound to a panel slider. When the feel is dialed in, these values transfer directly to the Phase 2 Swift `Config`.
+
+**See [`phase1/TUNING.md`](phase1/TUNING.md)** for a full guide: what each parameter does, the symptom → fix table, and starting recipes for smooth dragging vs. precise pointing vs. reliable swipes.
 
 ## Phase 2 — Native macOS App (not yet built)
 

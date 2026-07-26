@@ -154,9 +154,8 @@
   <h1>Air<span>Control</span> — Phase&nbsp;1</h1>
   <p>
     Gesture feel prototype. Grant camera access, then <b>pinch</b> (thumb + index)
-    to grab and drag the floating windows. <b>Four fingers</b> (thumb tucked) +
-    sweep switches Space; <b>all five</b> (thumb out) + sweep carries the focused
-    window across. Tune everything live from the panel.
+    to grab and drag the floating windows, and <b>four fingers</b> + sweep
+    left/right to switch between windows/Spaces. Tune everything live from the panel.
   </p>
   <button id="startBtn">Enable Camera &amp; Start</button>
   <div id="bootError"></div>
@@ -203,10 +202,6 @@
       <input type="range" id="palmMinFingers" min="3" max="4" step="1">
     </div>
     <div class="row">
-      <label>Thumb-out threshold (page vs window) <span class="val" id="v_thumbThresh"></span></label>
-      <input type="range" id="thumbThresh" min="0.9" max="1.6" step="0.02">
-    </div>
-    <div class="row">
       <label>Finger "extended" threshold <span class="val" id="v_extendThresh"></span></label>
       <input type="range" id="extendThresh" min="1.0" max="2.2" step="0.02">
     </div>
@@ -239,8 +234,7 @@
 
 <div id="hint">
   <b>Pinch</b> thumb+index to grab a window · move to drag · release to drop.<br>
-  <b>4 fingers</b> (thumb in) + sweep → switch Space <span style="color:#82ffaa">(green)</span>.<br>
-  <b>5 fingers</b> (thumb out) + sweep → move focused window <span style="color:#46d1ff">(blue)</span>.<br>
+  <b>4 fingers</b> + sweep left/right → switch window/Space.<br>
   Press <kbd>H</kbd> to hide/show this help · <kbd>P</kbd> to toggle the panel.
 </div>
 
@@ -258,10 +252,13 @@
    right, copy the final numbers into the Phase 2 Swift `Config` struct.
    ========================================================================== */
 const DEFAULTS = {
-  // --- Smoothing (exponential moving average) ---
-  // alpha in (0,1]. Higher = snappier but jitterier. Lower = smoother but laggier.
-  // smoothed = smoothed + alpha * (raw - smoothed)
-  posAlpha:      0.35,   // cursor position smoothing
+  // --- Smoothing ---
+  // posAlpha is now applied PER RENDER FRAME (60fps), eased frame-rate-independently
+  // toward the latest detection target. This decouples on-screen smoothness from the
+  // (slower, variable) camera detection rate, so the cursor and dragged windows glide
+  // instead of stepping. Higher = snappier but jitterier / follows the hand tighter.
+  // Lower = smoother/floatier but adds latency. 0.25–0.45 is a good drag range.
+  posAlpha:      0.35,   // cursor + dragged-window position easing (per 60fps frame)
   pinchAlpha:    0.5,    // pinch-distance signal smoothing (dampens threshold flicker)
 
   // --- Pinch detection (distance is normalized by hand size, see computePinch) ---
@@ -272,21 +269,15 @@ const DEFAULTS = {
   margin:        0.15,   // fraction of each axis treated as dead-zone at the edges,
                          // so you don't have to reach the literal frame border.
 
-  // --- Palm swipe (Space switch) ---
+  // --- Four-finger swipe (switch window/Space) ---
   // Displacement-over-time detection (robust to frame-rate & single-frame noise):
-  // an open palm must travel `swipeDist` (normalized x) within `swipeMaxTime` ms.
+  // four fingers must travel `swipeDist` (normalized x) within `swipeMaxTime` ms.
   swipeDist:     0.16,   // normalized-x hand travel that fires a swipe
   swipeMaxTime:  500,    // ms window the travel must happen within (a deliberate sweep)
   swipeCooldown: 700,    // ms lockout after a swipe so one gesture fires once
   palmMinFingers:4,      // extended fingers (index..pinky) required to arm a swipe
   extendThresh:  1.45,   // a finger counts as "extended" when tip-to-wrist distance
                          // exceeds this * pip-to-wrist distance.
-  // Thumb state is the discriminator between the two swipes:
-  //   4 fingers, thumb tucked  -> PAGE swipe  (switch Space)
-  //   4 fingers, thumb splayed -> WINDOW swipe (send focused window across)
-  thumbThresh:   1.20,   // thumb is "out" when tip-to-wrist > thumbThresh * mcp-to-wrist.
-                         // Higher = only a clearly splayed thumb counts as 5-finger,
-                         // keeping the page swipe the easy default.
 
   // --- Display toggles ---
   mirror:        true,
@@ -324,9 +315,9 @@ resize();
    ========================================================================== */
 function makeWindows() {
   return [
-    { id: 1, x: W*0.18, y: H*0.30, w: 300, h: 200, title: "Finder",   hue: 205 },
-    { id: 2, x: W*0.52, y: H*0.22, w: 340, h: 240, title: "Terminal", hue: 150 },
-    { id: 3, x: W*0.40, y: H*0.55, w: 280, h: 180, title: "Notes",    hue: 45  },
+    { id: 1, x: W*0.18, y: H*0.30, w: 300, h: 200, title: "Finder",   hue: 205, lift: 0 },
+    { id: 2, x: W*0.52, y: H*0.22, w: 340, h: 240, title: "Terminal", hue: 150, lift: 0 },
+    { id: 3, x: W*0.40, y: H*0.55, w: 280, h: 180, title: "Notes",    hue: 45,  lift: 0 },
   ];
 }
 let windows = makeWindows();
@@ -343,17 +334,18 @@ let lastSwipeTime = -1e9;      // timestamp of last accepted swipe
 const hand = {
   present:   false,   // is a hand currently detected?
   lastSeen:  0,       // ms timestamp of last detection (for throttle/idle)
-  // Smoothed, screen-mapped cursor position (CSS px):
+  // Cursor position (CSS px). `target` is set at detection rate; `x/y` is eased
+  // toward it every render frame (60fps) so motion doesn't step at the camera rate.
   x: W/2, y: H/2,
-  hasPos: false,      // has the EMA been seeded yet?
+  targetX: W/2, targetY: H/2,
+  hasPos: false,      // has the position been seeded yet?
   // Pinch:
   pinchRaw: 1,        // latest raw normalized pinch distance
   pinchSmooth: 1,     // EMA of pinch distance
   pinching: false,    // debounced pinch state (with hysteresis)
-  // Palm / swipe:
+  // Swipe:
   extended: 0,        // number of extended fingers (index..pinky) this frame
-  thumbOut: false,    // is the thumb splayed out? (page vs window discriminator)
-  swipeMode: null,    // null | 'page' (4 fingers, thumb in) | 'window' (thumb out)
+  swiping: false,     // are 4 fingers extended (swipe gesture armed)?
   palmHist: [],       // recent {t,x} samples of palm-center x while open (for swipe)
   lastPalmT: 0,       // ms of last open-palm sample (to re-arm after a real gap)
   swipeProgress: 0,   // signed 0..±1 progress toward a swipe (for visual feedback)
@@ -473,16 +465,17 @@ function onResults(results) {
   hand.present = true;
   hand.lastSeen = now;
 
-  // --- Cursor position: drive from the index-finger MCP (landmark 5) as a
+  // --- Cursor TARGET: drive from the index-finger MCP (landmark 5) as a
   //     stable "hand anchor". Using a knuckle rather than a fingertip keeps
-  //     the cursor from lurching when you pinch. ---
+  //     the cursor from lurching when you pinch. We only set the *target* here;
+  //     the smooth easing toward it happens every render frame (see render()),
+  //     which is what makes dragging glide instead of step at the camera rate. ---
   const anchor = lm[5];
   const mapped = mapToScreen(anchor.x, anchor.y);
-  if (!hand.hasPos) {           // seed EMA on first sample to avoid a fly-in
+  hand.targetX = mapped.x;
+  hand.targetY = mapped.y;
+  if (!hand.hasPos) {           // seed on first sample to avoid a fly-in
     hand.x = mapped.x; hand.y = mapped.y; hand.hasPos = true;
-  } else {
-    hand.x = ema(hand.x, mapped.x, CFG.posAlpha);
-    hand.y = ema(hand.y, mapped.y, CFG.posAlpha);
   }
 
   // --- Pinch signal (smoothed so it doesn't flicker at the threshold) ---
@@ -495,20 +488,9 @@ function onResults(results) {
     if (hand.pinchSmooth < CFG.pinchThresh) hand.pinching = true;
   }
 
-  // --- Four fingers + thumb state -> which swipe (page vs window) ---
+  // --- Four-finger swipe arming ---
   hand.extended = countExtended(lm);
-  // Thumb "out" test, mirroring the finger logic: tip-to-wrist vs MCP-to-wrist.
-  // Landmark 2 = thumb MCP, 4 = thumb tip. Robust to hand rotation.
-  const thumbLen  = dist3(lm[0], lm[4]);
-  const thumbBase = dist3(lm[0], lm[2]) || 1e-6;
-  hand.thumbOut = thumbLen > thumbBase * CFG.thumbThresh;
-  const fourFingers = hand.extended >= CFG.palmMinFingers && !hand.pinching;
-  // 4 fingers + thumb in => page swipe; + thumb out => whole-window swipe.
-  const mode = fourFingers ? (hand.thumbOut ? 'window' : 'page') : null;
-  // Re-arm when the mode changes (e.g. thumb flips) so travel never carries
-  // from one gesture into the other.
-  if (mode !== hand.swipeMode) { hand.palmHist.length = 0; hand.swipeProgress = 0; }
-  hand.swipeMode = mode;
+  hand.swiping = hand.extended >= CFG.palmMinFingers && !hand.pinching;
 
   // --- Swipe (displacement over a time window) ---
   // Use the palm CENTER (average of the base knuckles + wrist) rather than a
@@ -518,7 +500,7 @@ function onResults(results) {
   const pc = [lm[0], lm[5], lm[9], lm[13], lm[17]];
   let palmX = pc.reduce((s, p) => s + p.x, 0) / pc.length;
   if (CFG.mirror) palmX = 1 - palmX;
-  if (mode) {
+  if (hand.swiping) {
     updateSwipe(palmX, now);
   } else {
     hand.swipeProgress = 0;   // history is left to age out; a real gap re-arms it
@@ -548,49 +530,17 @@ function updateSwipe(x, now) {
   hand.swipeProgress = clamp(travel / CFG.swipeDist, -1, 1);
 
   if (now - lastSwipeTime < CFG.swipeCooldown) return;
-  if (Math.abs(travel) >= CFG.swipeDist) {
-    const dir = travel > 0 ? 1 : -1;
-    if (hand.swipeMode === 'window') fireWindowSwipe(dir, now);
-    else                             fireSwipe(dir, now);
-  }
+  if (Math.abs(travel) >= CFG.swipeDist) fireSwipe(travel > 0 ? 1 : -1, now);
 }
 
-/* PAGE swipe (4 fingers, thumb tucked): switch Space, leaving windows behind. */
+/* Four-finger swipe: switch to the adjacent window/Space. Always consumes the
+   cooldown and resets the sample window so one sweep fires exactly once. */
 function fireSwipe(dir, now) {
   const target = clamp(currentSpace + dir, 0, MOCK_SPACE_COUNT - 1);
   lastSwipeTime = now;
   hand.palmHist.length = 0;
   hand.swipeProgress = 0;
-  if (target !== currentSpace) { currentSpace = target; flashSwipe(dir, 'page'); }
-}
-
-/* WINDOW swipe (all 5 fingers, thumb splayed): take the focused window ALONG to
-   the adjacent Space — the window follows you across, instead of staying put.
-   (Mock semantic for feel-testing; in Phase 2 this maps to "move the focused
-   window to the adjacent Space" via the Accessibility API + Space switch.) */
-function fireWindowSwipe(dir, now) {
-  const target = clamp(currentSpace + dir, 0, MOCK_SPACE_COUNT - 1);
-  lastSwipeTime = now;
-  hand.palmHist.length = 0;
-  hand.swipeProgress = 0;
-  if (target === currentSpace) { flashSwipe(dir, 'window'); return; }  // at an edge
-  // Focused window = the one under the cursor, else the nearest on this Space.
-  const win = hoveredWindow || nearestWindowOnSpace(currentSpace);
-  if (win) win.space = target;         // window rides along to the destination
-  currentSpace = target;
-  flashSwipe(dir, 'window');
-}
-
-/* Nearest window (by on-screen center) currently living on Space `s`. */
-function nearestWindowOnSpace(s) {
-  let best = null, bestD = Infinity;
-  for (const w of windows) {
-    if (w.space !== s) continue;
-    const cxw = w.x + w.w / 2, cyw = w.y + w.h / 2; // on active space, on-screen x == w.x
-    const d = dist(hand.x, hand.y, cxw, cyw);
-    if (d < bestD) { bestD = d; best = w; }
-  }
-  return best;
+  if (target !== currentSpace) { currentSpace = target; flashSwipe(dir); }
 }
 
 /* ==========================================================================
@@ -620,8 +570,14 @@ async function pump() {
    even if detection FPS dips. Reads the shared `hand` state each frame.
    ========================================================================== */
 const MOCK_SPACE_COUNT = 2;
-let swipeFlash = { active: false, dir: 0, mode: 'page', t: 0 };
-function flashSwipe(dir, mode = 'page') { swipeFlash = { active: true, dir, mode, t: performance.now() }; }
+let swipeFlash = { active: false, dir: 0, t: 0 };
+function flashSwipe(dir) { swipeFlash = { active: true, dir, t: performance.now() }; }
+
+/* Frame-rate-independent easing factor for a per-60fps-frame alpha.
+   At dt = 1/60s this returns `alpha`; at lower/higher frame-rates it scales so
+   the *perceived* smoothing time constant stays the same. This is the trick
+   that makes dragging glide at 60fps regardless of the camera's detection rate. */
+function easeK(alpha, dt) { return 1 - Math.pow(1 - alpha, dt * 60); }
 
 let lastRenderT = performance.now();
 function render() {
@@ -643,12 +599,29 @@ function render() {
     drawGrid();
   }
 
+  // --- Render-rate cursor easing (THE smoothness fix) ---
+  // Detection updates hand.target* only ~15-30x/s; here we ease the displayed
+  // position toward it every render frame (~60x/s) so the cursor — and any window
+  // pinned to it while dragging — moves in continuous sub-pixel steps instead of
+  // jumping once per camera frame. posAlpha is the smoothing/latency trade-off.
+  if (hand.hasPos) {
+    const k = easeK(CFG.posAlpha, dt);
+    hand.x += (hand.targetX - hand.x) * k;
+    hand.y += (hand.targetY - hand.y) * k;
+  }
+
   // --- Animate the Space offset toward its target ---
   spaceTargetOffset = -currentSpace * W;
   spaceOffset = lerp(spaceOffset, spaceTargetOffset, 1 - Math.pow(0.001, dt)); // frame-rate independent ease
 
   // --- Update interaction (hover / drag) before drawing windows ---
   updateInteraction();
+
+  // --- Ease each window's "lift" (0..1) for a tactile pickup/drop ---
+  for (const w of windows) {
+    const target = (grabbed && grabbed.win === w) ? 1 : 0;
+    w.lift += (target - w.lift) * easeK(0.4, dt);
+  }
 
   // --- Draw the mock Spaces (each is a full-width panel side by side) ---
   drawSpaces();
@@ -739,12 +712,22 @@ function drawSpaces() {
 function drawWindow(w, x, y) {
   const isHover = (w === hoveredWindow);
   const isGrab  = grabbed && grabbed.win === w;
+  const lift = w.lift || 0;                 // 0..1 eased pickup amount
   ctx.save();
+
+  // Tactile "lift": a grabbed window scales up a touch about its center and
+  // gains a deeper drop-shadow, easing in on pickup and out on drop.
+  if (lift > 0.001) {
+    const s = 1 + 0.03 * lift;
+    const cxw = x + w.w / 2, cyw = y + w.h / 2;
+    ctx.translate(cxw, cyw); ctx.scale(s, s); ctx.translate(-cxw, -cyw);
+  }
 
   // Highlight border preview (previews Phase 2's "window about to be grabbed").
   if (isHover || isGrab) {
     ctx.shadowColor = isGrab ? 'rgba(255,180,84,0.7)' : 'rgba(70,209,255,0.6)';
-    ctx.shadowBlur = isGrab ? 28 : 18;
+    ctx.shadowBlur = (isGrab ? 28 : 18) + lift * 14;
+    ctx.shadowOffsetY = lift * 8;
   }
 
   // Body
@@ -864,9 +847,7 @@ function drawSkeleton() {
   const p = hand.landmarksPx;
   ctx.save();
   ctx.globalAlpha = 0.5;
-  ctx.strokeStyle = hand.swipeMode === 'window' ? 'rgba(70,209,255,0.95)'
-                  : hand.swipeMode === 'page'   ? 'rgba(130,255,170,0.9)'
-                  : 'rgba(207,227,242,0.7)';
+  ctx.strokeStyle = hand.swiping ? 'rgba(130,255,170,0.9)' : 'rgba(207,227,242,0.7)';
   ctx.lineWidth = 2;
   for (const [a,b] of HAND_CONNECTIONS) {
     ctx.beginPath(); ctx.moveTo(p[a].x, p[a].y); ctx.lineTo(p[b].x, p[b].y); ctx.stroke();
@@ -883,12 +864,10 @@ function drawSkeleton() {
 /* Progress bar above the cursor while an open palm is held: fills left/right
    toward the swipe-distance threshold so the gesture is legible while tuning. */
 function drawSwipeProgress() {
-  if (!hand.present || !hand.swipeMode) return;
+  if (!hand.present || !hand.swiping) return;
   const p = hand.swipeProgress;
   const cx = hand.x, cy = hand.y - 46, halfW = 62;
-  // Green = page swipe, blue = window swipe — matches the flash + skeleton.
-  const isWin = hand.swipeMode === 'window';
-  const rgb = isWin ? '70,209,255' : '130,255,170';
+  const rgb = '130,255,170';
   ctx.save();
   ctx.lineCap = 'round';
   // Track
@@ -901,13 +880,11 @@ function drawSwipeProgress() {
   ctx.shadowColor = `rgba(${rgb},0.8)`; ctx.shadowBlur = armed ? 14 : 0;
   ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + p * halfW, cy); ctx.stroke();
   ctx.shadowBlur = 0;
-  // Label: which swipe + live finger/thumb state
+  // Label: live finger count so you can see the palm is registering
   ctx.fillStyle = `rgba(${rgb},0.95)`;
   ctx.font = '600 11px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  const label = isWin ? 'move window · 5 fingers'
-                      : 'page swipe · ' + hand.extended + '/4 fingers';
-  ctx.fillText(label, cx, cy - 12);
+  ctx.fillText('swipe · ' + hand.extended + '/4 fingers', cx, cy - 12);
   ctx.textAlign = 'left';
   ctx.restore();
 }
@@ -918,7 +895,7 @@ function drawSwipeFlash(now) {
   const dur = 400;
   if (age > dur) { swipeFlash.active = false; return; }
   const p = age / dur;
-  const rgb = swipeFlash.mode === 'window' ? '70,209,255' : '130,255,170';
+  const rgb = '130,255,170';
   ctx.save();
   ctx.globalAlpha = (1 - p) * 0.5;
   const grad = ctx.createLinearGradient(
@@ -927,15 +904,12 @@ function drawSwipeFlash(now) {
   grad.addColorStop(1, `rgba(${rgb},0)`);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
-  // Arrow (double chevron = page, boxed chevron = window-carry)
+  // Arrow
   ctx.globalAlpha = (1 - p) * 0.9;
   ctx.fillStyle = `rgba(${rgb},1)`;
   ctx.font = '700 64px -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  const glyph = swipeFlash.mode === 'window'
-    ? (swipeFlash.dir > 0 ? '⧉»' : '«⧉')
-    : (swipeFlash.dir > 0 ? '»' : '«');
-  ctx.fillText(glyph, W/2, H/2);
+  ctx.fillText(swipeFlash.dir > 0 ? '»' : '«', W/2, H/2);
   ctx.textAlign = 'left';
   ctx.restore();
 }
@@ -967,18 +941,16 @@ const el = id => document.getElementById(id);
 function updateStats() {
   const g = el('s_gesture');
   let label = 'idle', cls = 'idle';
-  if (!hand.present)                 { label = 'no hand';     cls = 'idle'; }
-  else if (hand.pinching)            { label = 'pinch';       cls = 'pinch'; }
-  else if (hand.swipeMode==='window'){ label = 'window swipe';cls = 'hover'; }
-  else if (hand.swipeMode==='page')  { label = 'page swipe';  cls = 'palm'; }
-  else if (hoveredWindow)            { label = 'hover';       cls = 'hover'; }
-  else                               { label = 'tracking';    cls = 'idle'; }
+  if (!hand.present)         { label = 'no hand';  cls = 'idle'; }
+  else if (hand.pinching)    { label = 'pinch';    cls = 'pinch'; }
+  else if (hand.swiping)     { label = 'swipe';    cls = 'palm'; }
+  else if (hoveredWindow)    { label = 'hover';    cls = 'hover'; }
+  else                       { label = 'tracking'; cls = 'idle'; }
   g.textContent = label; g.className = 'pill ' + cls;
 
   el('s_pinchRaw').textContent    = hand.present ? hand.pinchRaw.toFixed(3) : '—';
   el('s_pinchSmooth').textContent = hand.present ? hand.pinchSmooth.toFixed(3) : '—';
-  el('s_fingers').textContent     = hand.present
-    ? (hand.extended + '/4' + (hand.thumbOut ? ' + thumb' : '')) : '—';
+  el('s_fingers').textContent     = hand.present ? (hand.extended + '/4') : '—';
   el('s_hand').textContent        = hand.present ? 'detected' : 'none';
   el('s_fps').textContent         = fpsEMA ? fpsEMA.toFixed(0) : '—';
 }
@@ -987,8 +959,7 @@ function updateStats() {
    10. Panel wiring — bind every slider/toggle to CFG, two-way with defaults.
    ========================================================================== */
 const SLIDERS = ['posAlpha','pinchAlpha','pinchThresh','pinchHyst','margin',
-                 'swipeDist','swipeMaxTime','swipeCooldown','palmMinFingers',
-                 'thumbThresh','extendThresh'];
+                 'swipeDist','swipeMaxTime','swipeCooldown','palmMinFingers','extendThresh'];
 function fmt(key, v) {
   if (key === 'swipeCooldown' || key === 'swipeMaxTime') return v + ' ms';
   if (key === 'palmMinFingers') return String(v);
