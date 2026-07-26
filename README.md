@@ -15,7 +15,7 @@ Uses [MediaPipe Hands](https://developers.google.com/mediapipe) (JS/WASM) for 21
 ### What it does
 - Live webcam feed with a custom canvas cursor overlay (no OS cursor involved).
 - **Pinch** (thumb tip ↔ index tip, normalized by hand size so it works at any distance) to grab and drag mock windows; release to drop. The grab point stays fixed relative to the window.
-- **Open palm + lateral sweep** switches between two mock Spaces, with a cooldown so one sweep fires once. Verified not to false-trigger against pinch.
+- **Open palm + lateral sweep** switches between two mock Spaces. Detection is **displacement-over-a-time-window** (the palm must travel a set distance within N ms), not instantaneous velocity — robust to frame-rate and brief tracking dropouts, and it won't false-trigger on slow drift. A live progress bar + finger-count readout shows the gesture arming.
 - **EMA smoothing** on both cursor position and the pinch signal, with pinch **hysteresis** to stop threshold flicker.
 - **Coordinate mapping** from normalized webcam space to screen space with a configurable edge margin (dead-zone), so you never have to reach the literal frame edge.
 - Cursor states — idle ring → hover highlight → filled pinch dot — with smooth animated transitions, plus a targeting-style highlight border on the window about to be grabbed (previews the real Phase 2 behavior).
@@ -31,7 +31,27 @@ All defaults live in one place — the `DEFAULTS` object at the top of the `<scr
 
 ## Phase 2 — Native macOS App (not yet built)
 
-A Swift menu-bar app carrying over the tuned constants: `AVFoundation` capture → Vision `VNDetectHumanHandPoseRequest` for landmarks → Accessibility API (`AXUIElement`) to move real windows → `CGEvent` for Space switching. Multi-monitor coordinate mapping with a re-runnable pinch calibration, per-display click-through overlay windows, and live window-under-pointer highlighting.
+A Swift menu-bar app carrying over the tuned constants: `AVFoundation` capture → Vision `VNDetectHumanHandPoseRequest` for landmarks → Accessibility API (`AXUIElement`) to move real windows → `CGEvent` for Space switching. Per-display click-through overlay windows and live window-under-pointer highlighting.
+
+### Multi-monitor pointer mapping (design)
+
+The hard problem on a multi-monitor setup: a comfortable in-air hand range is small, but the desktop can be very wide. Mapping the whole hand range across the full multi-display bounding box (naive absolute mapping) destroys precision — a twitch throws the pointer across three screens. Mapping it to one display makes the others unreachable.
+
+**Chosen approach: per-display absolute mapping + a clutched, animated hand-off at monitor seams.** This matches the "remap each time you jump monitors, but keep it smooth" idea.
+
+1. **Absolute within the active display.** The calibrated comfortable hand range (from the pinch-corner calibration) maps 1:1 to the *current* display's bounds only. Full precision, predictable "point where you mean" feel — you get the whole hand range for one screen instead of spreading it thin across all of them.
+
+2. **Push-to-cross hand-off (the clutch).** Displays know their neighbors from the arrangement topology (`NSScreen.frame` in the global coordinate space — handles horizontal, vertical, and offset/mismatched-size layouts). When the pointer reaches an edge that borders another display and the hand keeps pushing past it, it must clear an **edge-pressure threshold** — travel a bit beyond the edge *or* dwell against it for a few frames (hysteresis) — before the hand-off commits. That gate stops accidental screen jumps. Committing the cross **re-anchors** the mapping so the hand's current position now corresponds to the *entry edge* of the new display. Re-anchoring is the clutch: each monitor effectively gets the full hand range, so you never run out of reach mid-desktop.
+
+3. **Smooth seam transition.** During a hand-off the pointer is briefly *animated* across the physical gap between the two displays (a short eased tween, matched to the overlay's existing cursor animation) rather than teleporting, and y is aligned to where the pointer was so it doesn't jump vertically when displays are offset. Reads as one continuous glide across the seam.
+
+4. **Optional explicit clutch gesture.** A dedicated "freeze" gesture (candidate: closed fist, or a held two-finger pause) that pins the pointer so you can recenter your arm without moving it — exactly like lifting a mouse off the desk — then re-engage. Useful for long reaches and as a manual way to settle before a precise grab. To be prototyped for feel before committing.
+
+**Alternative kept in reserve — pure relative / trackpad mode:** pointer moves by hand *delta* with velocity-adaptive gain (slow = fine, fast = coarse), clutch = fist-and-reposition. Spans all monitors with zero seam logic, but loses the absolute point-where-you-look feel. Offer as a toggle if the absolute+hand-off model feels too constrained in testing.
+
+Calibration feeds this directly: the pinch-at-top-left / pinch-at-bottom-right step sets the comfortable hand range that maps to *each* display, and is re-runnable from the menu bar.
+
+> Worth prototyping the seam hand-off + clutch feel in the Phase 1 web rig first — a single wide canvas can simulate two side-by-side "monitors" so the interaction is validated before writing the `NSScreen`/overlay plumbing. Say the word and I'll add it.
 
 Out of scope for Phase 2 v1: multi-user profiles, custom gesture training, iOS companion, window resizing (move only), anything requiring network access.
 

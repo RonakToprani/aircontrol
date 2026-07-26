@@ -186,15 +186,23 @@
       <input type="range" id="margin" min="0" max="0.4" step="0.01">
     </div>
     <div class="row">
-      <label>Palm swipe velocity thresh <span class="val" id="v_swipeVel"></span></label>
-      <input type="range" id="swipeVel" min="0.2" max="4" step="0.05">
+      <label>Swipe travel distance <span class="val" id="v_swipeDist"></span></label>
+      <input type="range" id="swipeDist" min="0.05" max="0.4" step="0.01">
+    </div>
+    <div class="row">
+      <label>Swipe time window (ms) <span class="val" id="v_swipeMaxTime"></span></label>
+      <input type="range" id="swipeMaxTime" min="250" max="1000" step="50">
     </div>
     <div class="row">
       <label>Swipe cooldown (ms) <span class="val" id="v_swipeCooldown"></span></label>
       <input type="range" id="swipeCooldown" min="200" max="2000" step="50">
     </div>
     <div class="row">
-      <label>Palm "extended" threshold <span class="val" id="v_extendThresh"></span></label>
+      <label>Open-palm min fingers <span class="val" id="v_palmMinFingers"></span></label>
+      <input type="range" id="palmMinFingers" min="3" max="4" step="1">
+    </div>
+    <div class="row">
+      <label>Finger "extended" threshold <span class="val" id="v_extendThresh"></span></label>
       <input type="range" id="extendThresh" min="1.0" max="2.2" step="0.02">
     </div>
 
@@ -259,10 +267,14 @@ const DEFAULTS = {
                          // so you don't have to reach the literal frame border.
 
   // --- Palm swipe (Space switch) ---
-  swipeVel:      1.4,    // normalized-x velocity (per second) needed to trigger a swipe
+  // Displacement-over-time detection (robust to frame-rate & single-frame noise):
+  // an open palm must travel `swipeDist` (normalized x) within `swipeMaxTime` ms.
+  swipeDist:     0.16,   // normalized-x hand travel that fires a swipe
+  swipeMaxTime:  500,    // ms window the travel must happen within (a deliberate sweep)
   swipeCooldown: 700,    // ms lockout after a swipe so one gesture fires once
-  extendThresh:  1.5,    // a finger counts as "extended" when tip-to-wrist distance
-                         // exceeds this * pip-to-wrist distance. 4 extended => open palm.
+  palmMinFingers:4,      // extended fingers required to count as an open palm (3 or 4)
+  extendThresh:  1.45,   // a finger counts as "extended" when tip-to-wrist distance
+                         // exceeds this * pip-to-wrist distance.
 
   // --- Display toggles ---
   mirror:        true,
@@ -329,8 +341,9 @@ const hand = {
   // Palm / swipe:
   extended: 0,        // number of extended fingers this frame
   openPalm: false,
-  prevPalmX: null,    // normalized x last frame while palm open (for velocity)
-  prevPalmT: 0,
+  palmHist: [],       // recent {t,x} samples of palm-center x while open (for swipe)
+  lastPalmT: 0,       // ms of last open-palm sample (to re-arm after a real gap)
+  swipeProgress: 0,   // signed 0..±1 progress toward a swipe (for visual feedback)
   // Raw landmarks for skeleton drawing (screen px), or null:
   landmarksPx: null,
 };
@@ -438,7 +451,7 @@ function onResults(results) {
   if (!list || list.length === 0) {
     hand.present = false;
     hand.landmarksPx = null;
-    hand.prevPalmX = null;
+    hand.swipeProgress = 0;
     return;
   }
 
@@ -471,39 +484,57 @@ function onResults(results) {
 
   // --- Open palm / four-finger spread ---
   hand.extended = countExtended(lm);
-  hand.openPalm = hand.extended >= 4 && !hand.pinching;
+  hand.openPalm = hand.extended >= CFG.palmMinFingers && !hand.pinching;
 
-  // --- Palm swipe velocity (normalized x per second) ---
-  // Measured on the raw (mirrored) hand x so it's independent of screen size.
-  const palmX = CFG.mirror ? (1 - anchor.x) : anchor.x;
+  // --- Palm swipe (displacement over a time window) ---
+  // Use the palm CENTER (average of the base knuckles + wrist) rather than a
+  // single point: it stays stable while the fingers spread and survives brief
+  // tracking noise. x is taken in the same mirrored frame as the cursor so the
+  // swipe direction matches what you see on screen.
+  const pc = [lm[0], lm[5], lm[9], lm[13], lm[17]];
+  let palmX = pc.reduce((s, p) => s + p.x, 0) / pc.length;
+  if (CFG.mirror) palmX = 1 - palmX;
   if (hand.openPalm) {
-    if (hand.prevPalmX !== null) {
-      const dt = Math.max(1, now - hand.prevPalmT) / 1000;
-      const vx = (palmX - hand.prevPalmX) / dt;
-      maybeSwipe(vx, now);
-    }
-    hand.prevPalmX = palmX;
-    hand.prevPalmT = now;
+    updateSwipe(palmX, now);
   } else {
-    hand.prevPalmX = null;
+    hand.swipeProgress = 0;   // history is left to age out; a real gap re-arms it
   }
 
   // --- Landmarks in screen px for skeleton overlay ---
   hand.landmarksPx = lm.map(p => mapToScreen(p.x, p.y));
 }
 
-/* Trigger a Space switch if palm velocity exceeds threshold and we're past the
-   cooldown. Direction: positive vx (hand moving right on screen) => next Space. */
-function maybeSwipe(vx, now) {
+/* --- Swipe detection: displacement over a rolling time window ----------------
+   Far more robust than instantaneous velocity. We keep the last `swipeMaxTime`
+   ms of open-palm x samples; if the net travel across that window exceeds
+   `swipeDist`, we fire once (then reset + cooldown). Because it only needs a
+   start and end sample, it survives low frame-rates and brief mid-sweep
+   tracking dropouts that made the old velocity approach miss. */
+function updateSwipe(x, now) {
+  const h = hand.palmHist;
+  // If the palm was gone for a real gap (not just a 1-2 frame blip), start fresh
+  // so a reposition after closing the hand can't read as a swipe.
+  if (hand.lastPalmT && now - hand.lastPalmT > 160) h.length = 0;
+  hand.lastPalmT = now;
+
+  h.push({ t: now, x });
+  while (h.length > 1 && now - h[0].t > CFG.swipeMaxTime) h.shift();
+
+  const travel = x - h[0].x;                        // oldest-in-window -> now
+  hand.swipeProgress = clamp(travel / CFG.swipeDist, -1, 1);
+
   if (now - lastSwipeTime < CFG.swipeCooldown) return;
-  if (Math.abs(vx) < CFG.swipeVel) return;
-  const dir = vx > 0 ? 1 : -1;
+  if (Math.abs(travel) >= CFG.swipeDist) fireSwipe(travel > 0 ? 1 : -1, now);
+}
+
+/* Commit one Space switch in `dir` (+1 = right/next). Always consumes the
+   cooldown and resets the sample window so one sweep fires exactly once. */
+function fireSwipe(dir, now) {
   const target = clamp(currentSpace + dir, 0, MOCK_SPACE_COUNT - 1);
-  if (target === currentSpace) { lastSwipeTime = now; return; } // at an edge; still consume
-  currentSpace = target;
   lastSwipeTime = now;
-  hand.prevPalmX = null;       // reset so we need a fresh sweep for the next switch
-  flashSwipe(dir);
+  hand.palmHist.length = 0;
+  hand.swipeProgress = 0;
+  if (target !== currentSpace) { currentSpace = target; flashSwipe(dir); }
 }
 
 /* ==========================================================================
@@ -568,6 +599,9 @@ function render() {
 
   // --- Draw the hand cursor on top of everything ---
   drawCursor(dt);
+
+  // --- Swipe-arming feedback (shows the gesture building) ---
+  drawSwipeProgress();
 
   // --- Skeleton overlay (debug) ---
   if (CFG.showSkeleton && hand.landmarksPx) drawSkeleton();
@@ -788,6 +822,33 @@ function drawSkeleton() {
   ctx.restore();
 }
 
+/* Progress bar above the cursor while an open palm is held: fills left/right
+   toward the swipe-distance threshold so the gesture is legible while tuning. */
+function drawSwipeProgress() {
+  if (!hand.present || !hand.openPalm) return;
+  const p = hand.swipeProgress;
+  const cx = hand.x, cy = hand.y - 46, halfW = 62;
+  ctx.save();
+  ctx.lineCap = 'round';
+  // Track
+  ctx.strokeStyle = 'rgba(130,255,170,0.30)';
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(cx - halfW, cy); ctx.lineTo(cx + halfW, cy); ctx.stroke();
+  // Fill toward direction (bright + glowing when threshold reached)
+  const armed = Math.abs(p) >= 0.999;
+  ctx.strokeStyle = armed ? 'rgba(130,255,170,1)' : 'rgba(130,255,170,0.85)';
+  ctx.shadowColor = 'rgba(130,255,170,0.8)'; ctx.shadowBlur = armed ? 14 : 0;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + p * halfW, cy); ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Label with live finger count
+  ctx.fillStyle = 'rgba(130,255,170,0.9)';
+  ctx.font = '600 11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('palm swipe · ' + hand.extended + '/4 fingers', cx, cy - 12);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
 function drawSwipeFlash(now) {
   if (!swipeFlash.active) return;
   const age = now - swipeFlash.t;
@@ -856,9 +917,10 @@ function updateStats() {
    10. Panel wiring — bind every slider/toggle to CFG, two-way with defaults.
    ========================================================================== */
 const SLIDERS = ['posAlpha','pinchAlpha','pinchThresh','pinchHyst','margin',
-                 'swipeVel','swipeCooldown','extendThresh'];
+                 'swipeDist','swipeMaxTime','swipeCooldown','palmMinFingers','extendThresh'];
 function fmt(key, v) {
-  if (key === 'swipeCooldown') return v + ' ms';
+  if (key === 'swipeCooldown' || key === 'swipeMaxTime') return v + ' ms';
+  if (key === 'palmMinFingers') return String(v);
   return (+v).toFixed(2);
 }
 function syncSliderUI(key) {
@@ -887,6 +949,7 @@ el('resetBtn').addEventListener('click', () => {
   windows.forEach(w => w.space = 0);
   windows[2].space = 1;
   currentSpace = 0; grabbed = null; hoveredWindow = null;
+  hand.palmHist.length = 0; hand.swipeProgress = 0; lastSwipeTime = -1e9;
 });
 
 // Collapse panel body
