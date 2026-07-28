@@ -218,6 +218,10 @@
       <input type="checkbox" id="showSkeleton" checked>
       <label for="showSkeleton">Show hand skeleton</label>
     </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="accurateModel">
+      <label for="accurateModel">Accurate model (slower — raises FPS when off)</label>
+    </div>
 
     <button id="resetBtn">Reset windows &amp; defaults</button>
 
@@ -225,7 +229,7 @@
       <div class="stat"><span>Gesture</span><b><span class="pill idle" id="s_gesture">—</span></b></div>
       <div class="stat"><span>Pinch dist (raw)</span><b id="s_pinchRaw">—</b></div>
       <div class="stat"><span>Pinch dist (smooth)</span><b id="s_pinchSmooth">—</b></div>
-      <div class="stat"><span>Fingers / thumb</span><b id="s_fingers">—</b></div>
+      <div class="stat"><span>Fingers extended</span><b id="s_fingers">—</b></div>
       <div class="stat"><span>Hand</span><b id="s_hand">none</b></div>
       <div class="stat"><span>Detect FPS</span><b id="s_fps">—</b></div>
     </div>
@@ -279,10 +283,11 @@ const DEFAULTS = {
   extendThresh:  1.45,   // a finger counts as "extended" when tip-to-wrist distance
                          // exceeds this * pip-to-wrist distance.
 
-  // --- Display toggles ---
+  // --- Display / model toggles ---
   mirror:        true,
   showVideo:     true,
   showSkeleton:  true,
+  accurateModel: false,  // false = lite model (fast, default); true = full model (slower)
 };
 
 // Live config (mutated by sliders). Cloned from defaults.
@@ -336,8 +341,14 @@ const hand = {
   lastSeen:  0,       // ms timestamp of last detection (for throttle/idle)
   // Cursor position (CSS px). `target` is set at detection rate; `x/y` is eased
   // toward it every render frame (60fps) so motion doesn't step at the camera rate.
+  // Cursor tracks the index FINGERTIP (landmark 8).
   x: W/2, y: H/2,
   targetX: W/2, targetY: H/2,
+  // Grab DRIVER position — tracks the index MCP knuckle (landmark 5), which
+  // barely moves when the finger curls to pinch. Dragging follows this so a
+  // grabbed window doesn't lurch at the moment of the pinch.
+  gx: W/2, gy: H/2,
+  targetGX: W/2, targetGY: H/2,
   hasPos: false,      // has the position been seeded yet?
   // Pinch:
   pinchRaw: 1,        // latest raw normalized pinch distance
@@ -465,17 +476,19 @@ function onResults(results) {
   hand.present = true;
   hand.lastSeen = now;
 
-  // --- Cursor TARGET: drive from the index-finger MCP (landmark 5) as a
-  //     stable "hand anchor". Using a knuckle rather than a fingertip keeps
-  //     the cursor from lurching when you pinch. We only set the *target* here;
-  //     the smooth easing toward it happens every render frame (see render()),
-  //     which is what makes dragging glide instead of step at the camera rate. ---
-  const anchor = lm[5];
-  const mapped = mapToScreen(anchor.x, anchor.y);
-  hand.targetX = mapped.x;
-  hand.targetY = mapped.y;
+  // --- Cursor TARGET = index FINGERTIP (landmark 8): the natural place to point
+  //     from. --- Grab DRIVER TARGET = index MCP knuckle (landmark 5): stable
+  //     through a pinch curl, so dragging tracks it and doesn't lurch. We set only
+  //     the *targets* here; the smooth easing toward them happens every render
+  //     frame (see render()), which makes motion glide instead of step. ---
+  const tip     = mapToScreen(lm[8].x, lm[8].y);
+  const knuckle = mapToScreen(lm[5].x, lm[5].y);
+  hand.targetX  = tip.x;     hand.targetY  = tip.y;
+  hand.targetGX = knuckle.x; hand.targetGY = knuckle.y;
   if (!hand.hasPos) {           // seed on first sample to avoid a fly-in
-    hand.x = mapped.x; hand.y = mapped.y; hand.hasPos = true;
+    hand.x  = tip.x;     hand.y  = tip.y;
+    hand.gx = knuckle.x; hand.gy = knuckle.y;
+    hand.hasPos = true;
   }
 
   // --- Pinch signal (smoothed so it doesn't flicker at the threshold) ---
@@ -518,9 +531,12 @@ function onResults(results) {
    tracking dropouts that made the old velocity approach miss. */
 function updateSwipe(x, now) {
   const h = hand.palmHist;
-  // If the palm was gone for a real gap (not just a 1-2 frame blip), start fresh
-  // so a reposition after closing the hand can't read as a swipe.
-  if (hand.lastPalmT && now - hand.lastPalmT > 160) h.length = 0;
+  // If the palm was gone for a REAL gap (hand closed / left frame), start fresh
+  // so a reposition afterward can't read as a swipe. This must be well above the
+  // detection frame interval — at ~7-15 FPS a single frame is 70-140ms, so the
+  // old 160ms threshold wrongly wiped the swipe mid-sweep. 350ms tolerates a
+  // couple of dropped frames while still catching a genuine pause.
+  if (hand.lastPalmT && now - hand.lastPalmT > 350) h.length = 0;
   hand.lastPalmT = now;
 
   h.push({ t: now, x });
@@ -606,8 +622,10 @@ function render() {
   // jumping once per camera frame. posAlpha is the smoothing/latency trade-off.
   if (hand.hasPos) {
     const k = easeK(CFG.posAlpha, dt);
-    hand.x += (hand.targetX - hand.x) * k;
-    hand.y += (hand.targetY - hand.y) * k;
+    hand.x  += (hand.targetX  - hand.x)  * k;   // fingertip cursor
+    hand.y  += (hand.targetY  - hand.y)  * k;
+    hand.gx += (hand.targetGX - hand.gx) * k;   // knuckle grab-driver
+    hand.gy += (hand.targetGY - hand.gy) * k;
   }
 
   // --- Animate the Space offset toward its target ---
@@ -652,19 +670,24 @@ function drawGrid() {
   ctx.restore();
 }
 
-/* Hover / grab logic. Runs each render frame from the smoothed cursor pos. */
+/* Hover / grab logic. Runs each render frame.
+   - Hover + grab *initiation* use the fingertip cursor (cx,cy) so you grab what
+     the pointer is visibly over.
+   - The drag itself is driven by the knuckle (gx,gy), which doesn't lurch when
+     the finger curls to pinch — so the window doesn't jump at grab time. */
 function updateInteraction() {
-  const cx = hand.x, cy = hand.y;
+  const cx = hand.x, cy = hand.y;      // fingertip cursor (for hover)
 
   // If pinching and not yet grabbing, try to grab the hovered window.
+  // Offset is captured against the knuckle driver so movement is lurch-free.
   if (hand.pinching && !grabbed && hoveredWindow) {
-    grabbed = { win: hoveredWindow, offsetX: cx - hoveredWindow.x, offsetY: cy - hoveredWindow.y };
+    grabbed = { win: hoveredWindow, offsetX: hand.gx - hoveredWindow.x, offsetY: hand.gy - hoveredWindow.y };
   }
   // While grabbing, move the window (offset preserved so grab point is stable).
   if (grabbed) {
     if (hand.pinching) {
-      grabbed.win.x = cx - grabbed.offsetX;
-      grabbed.win.y = cy - grabbed.offsetY;
+      grabbed.win.x = hand.gx - grabbed.offsetX;
+      grabbed.win.y = hand.gy - grabbed.offsetY;
     } else {
       grabbed = null;                 // released -> drop where it is
     }
@@ -977,16 +1000,20 @@ SLIDERS.forEach(key => {
   });
   syncSliderUI(key);
 });
-['mirror','showVideo','showSkeleton'].forEach(key => {
+['mirror','showVideo','showSkeleton','accurateModel'].forEach(key => {
   const input = el(key);
   input.checked = CFG[key];
-  input.addEventListener('change', () => { CFG[key] = input.checked; });
+  input.addEventListener('change', () => {
+    CFG[key] = input.checked;
+    if (key === 'accurateModel') applyHandsOptions();  // re-push model setting live
+  });
 });
 
 el('resetBtn').addEventListener('click', () => {
   Object.assign(CFG, DEFAULTS);
   SLIDERS.forEach(syncSliderUI);
-  ['mirror','showVideo','showSkeleton'].forEach(k => el(k).checked = CFG[k]);
+  ['mirror','showVideo','showSkeleton','accurateModel'].forEach(k => el(k).checked = CFG[k]);
+  applyHandsOptions();
   windows = makeWindows();
   windows.forEach(w => w.space = 0);
   windows[2].space = 1;
@@ -1015,13 +1042,28 @@ window.addEventListener('keydown', (e) => {
 /* ==========================================================================
    11. Boot: request camera, init MediaPipe, start loops.
    ========================================================================== */
+/* Push the current model settings to MediaPipe. modelComplexity 0 = the LITE
+   model (much faster, the default here — it roughly doubles detection FPS on
+   most machines); 1 = the full model (more accurate, slower). Safe to call at
+   runtime; the new setting applies on the next frame. */
+function applyHandsOptions() {
+  if (!hands) return;
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: CFG.accurateModel ? 1 : 0,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6,
+  });
+}
+
 async function start() {
   startBtn.disabled = true;
   bootErr.textContent = '';
   try {
-    // 1. Camera
+    // 1. Camera — request a modest resolution. Hand tracking doesn't need 720p,
+    //    and a smaller frame is cheaper to process, which lifts the detection FPS.
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+      video: { width: { ideal: 960 }, height: { ideal: 540 }, facingMode: 'user' },
       audio: false,
     });
     video.srcObject = stream;
@@ -1034,12 +1076,7 @@ async function start() {
     hands = new Hands({
       locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
     });
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 1,       // 0 = faster/less accurate, 1 = default. Tune for latency.
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6,
-    });
+    applyHandsOptions();       // sets modelComplexity from the "Accurate model" toggle
     hands.onResults(onResults);
 
     // 3. Go

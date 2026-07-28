@@ -2,7 +2,11 @@
 
 Every value below is a **live slider** in the on-page panel (top-right). Nothing is hardcoded — tune by feel while gesturing, then copy the numbers you land on into the Phase 2 Swift app. Defaults live in the `DEFAULTS` block at the top of the `<script>` in [`index.html`](index.html).
 
-The fastest way to tune: watch the **live readouts** at the bottom of the panel while you move — `Gesture`, `Pinch dist (raw / smooth)`, `Fingers / thumb`, `Detect FPS`. They tell you *why* something isn't triggering.
+The fastest way to tune: watch the **live readouts** at the bottom of the panel while you move — `Gesture`, `Pinch dist (raw / smooth)`, `Fingers extended`, `Detect FPS`. They tell you *why* something isn't triggering.
+
+> **Start here:** if `Detect FPS` is below ~15, fix that before touching any slider (see [Detect FPS is low](#detect-fps-is-low--15--fix-this-first)). Low FPS is the #1 cause of laggy dragging and flaky swipes.
+
+**Pointer position:** the cursor tracks your **index fingertip**. When you pinch, the *drag* is driven by the index knuckle (which barely moves as the finger curls), so a grabbed window doesn't jump at the moment you pinch — the cursor stays on the fingertip, the window stays put.
 
 ---
 
@@ -37,11 +41,15 @@ Per-render-frame easing toward the hand's latest position. Frame-rate-independen
 
 **The trade-off is always smoothness vs. latency.** For dragging windows, a touch more smoothing (0.25–0.35) feels good. For precise pointing, tighter (0.4–0.5). Pick for the task you do most.
 
-### `Detect FPS` is low (< ~15)
-Not a slider — it's a readout. If it's low, everything feels laggy no matter the smoothing. To raise it:
-- Improve **lighting** on your hand (the single biggest factor).
+### `Detect FPS` is low (< ~15) — fix this FIRST
+Not a slider — it's a readout, and it's the **most important number on the panel**. If it's low (e.g. 7), everything feels laggy and swipes are unreliable no matter how you set the smoothing, because the model is only producing a hand position 7×/second. Raise it before tuning anything else:
+
+- **Leave `Accurate model` OFF** (the default). Off = MediaPipe's *lite* model, which roughly doubles FPS for a small accuracy cost. Only turn it on if your FPS is already high (20+) and you want steadier landmarks. You can flip it live and watch `Detect FPS` react.
+- Improve **lighting** on your hand — the single biggest real-world factor.
 - Keep the hand **fully in frame** and not too far from the camera.
-- In `index.html`, set `modelComplexity: 0` in the `hands.setOptions({...})` call (faster, slightly less accurate) — this is a code change, not a slider.
+- Close other heavy apps / unplug from an external 4K display if the machine is thermally throttling.
+
+Target ≥ 15 FPS for usable feel, ≥ 25 for great feel. The render-easing keeps motion smooth *between* detections, but it can't invent hand data that isn't there — so FPS sets the ceiling.
 
 ---
 
