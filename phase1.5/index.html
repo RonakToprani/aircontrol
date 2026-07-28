@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AirControl — Phase 1.5 Multi-Display Mapping</title>
+<!--
+  ============================================================================
+  AirControl — Phase 1.5: Multi-Display Pointer-Mapping Rig
+  ============================================================================
+  Purpose: BEFORE writing the native multi-monitor plumbing in Phase 2, decide
+  HOW an in-air hand should map onto a multi-display desktop. A comfortable hand
+  range is small; a multi-monitor desktop is huge. This rig simulates 2-3
+  monitors on one screen and lets you feel three candidate mapping models
+  side-by-side, so we pick the right one on real feel instead of a guess.
+
+  Carries over Phase 1's validated feel: index-FINGERTIP pointer, EMA + 60fps
+  render easing, pinch-to-grab, 4-finger swipe, and Ronak's tuned constants.
+
+  THREE MAPPING MODES (switch live, top of panel):
+    1. Direct absolute   — hand range spans the WHOLE desktop. Baseline; feel
+                           why it's imprecise on a wide setup.
+    2. Per-display+clutch — hand maps absolutely within the ACTIVE display
+                           (full precision). Cross to a neighbor by dwelling at
+                           the shared edge (animated hand-off), OR 4-finger
+                           swipe to jump. Make a FIST to clutch: freeze the
+                           pointer, reposition your arm, open to re-engage
+                           (like lifting a mouse). ← the README's chosen model.
+    3. Relative+clutch   — trackpad style: pointer moves by hand DELTA with
+                           velocity-adaptive gain; fist = clutch/reposition.
+                           Spans all monitors with no seam logic.
+
+  Same MediaPipe CDN note as Phase 1: one-time asset fetch for the web rig only;
+  Phase 2 uses Apple's on-device Vision framework.
+  ============================================================================
+-->
+<style>
+  :root {
+    --bg: #070a10;
+    --panel-bg: rgba(18, 24, 34, 0.92);
+    --panel-border: rgba(90, 120, 160, 0.25);
+    --accent: #46d1ff;
+    --accent-warm: #ffb454;
+    --accent-green: #82ffaa;
+    --text: #cfe3f2;
+    --text-dim: #7d93a8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  #webcam { display: none; }
+  #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: none; }
+
+  #boot {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; text-align: center; padding: 24px;
+    background: radial-gradient(circle at 50% 40%, #10182400, #04060a 80%), var(--bg);
+  }
+  #boot h1 { font-size: 25px; font-weight: 600; }
+  #boot h1 span { color: var(--accent); }
+  #boot p { color: var(--text-dim); max-width: 560px; line-height: 1.55; font-size: 14px; }
+  #startBtn {
+    margin-top: 6px; padding: 12px 28px; font-size: 15px; font-weight: 600;
+    color: #04202b; background: var(--accent); border: none; border-radius: 10px;
+    cursor: pointer; box-shadow: 0 6px 24px rgba(70,209,255,0.3);
+  }
+  #bootError { color: #ff6b6b; font-size: 13px; min-height: 16px; }
+
+  #panel {
+    position: fixed; top: 12px; right: 12px; z-index: 40;
+    width: 300px; max-height: calc(100vh - 24px); overflow-y: auto;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    border-radius: 14px; padding: 13px 15px; backdrop-filter: blur(12px);
+    font-size: 12px; line-height: 1.4; box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  }
+  #panel h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px;
+    color: var(--text-dim); font-weight: 600; margin: 4px 0 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #panel h2:first-child { margin-top: 0; }
+  .collapse { cursor: pointer; color: var(--accent); font-size: 14px; }
+  .btnrow { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .btnrow button {
+    flex: 1 1 auto; padding: 7px 6px; font-size: 11px; font-weight: 600;
+    color: var(--text-dim); background: rgba(90,120,160,0.12);
+    border: 1px solid var(--panel-border); border-radius: 8px; cursor: pointer;
+    white-space: nowrap;
+  }
+  .btnrow button.active { color: #04202b; background: var(--accent); border-color: var(--accent); }
+  .row { margin-bottom: 11px; }
+  .row label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .row label .val { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 4px; }
+  .toggle-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .toggle-row input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .toggle-row label { cursor: pointer; }
+  #resetBtn {
+    width: 100%; margin-top: 8px; padding: 7px; font-size: 12px; font-weight: 600;
+    color: var(--text); background: rgba(90,120,160,0.15);
+    border: 1px solid var(--panel-border); border-radius: 8px; cursor: pointer;
+  }
+  #stats {
+    margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--panel-border);
+    font-variant-numeric: tabular-nums; color: var(--text-dim);
+  }
+  #stats .stat { display: flex; justify-content: space-between; padding: 2px 0; }
+  #stats .stat b { color: var(--text); font-weight: 500; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .pill.idle { background: rgba(125,147,168,0.2); color: var(--text-dim); }
+  .pill.hover { background: rgba(70,209,255,0.2); color: var(--accent); }
+  .pill.pinch { background: rgba(255,180,84,0.22); color: var(--accent-warm); }
+  .pill.palm { background: rgba(130,255,170,0.2); color: var(--accent-green); }
+  .pill.clutch{ background: rgba(200,120,255,0.22); color: #c880ff; }
+  #hint {
+    position: fixed; bottom: 12px; left: 12px; z-index: 30;
+    color: var(--text-dim); font-size: 12px; line-height: 1.6;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(8px); max-width: 380px;
+  }
+  #hint b { color: var(--text); }
+  kbd { background: rgba(90,120,160,0.2); border: 1px solid var(--panel-border); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<video id="webcam" playsinline></video>
+<canvas id="stage"></canvas>
+
+<div id="boot">
+  <h1>Air<span>Control</span> — Phase&nbsp;1.5</h1>
+  <p>
+    Multi-display mapping rig. Grant camera access, then test how your hand maps
+    across simulated monitors. <b>Pinch</b> to grab windows, <b>4 fingers + sweep</b>
+    to jump displays, <b>make a fist</b> to clutch (freeze &amp; reposition your arm).
+    Switch mapping models live from the panel and tell me which feels right.
+  </p>
+  <button id="startBtn">Enable Camera &amp; Start</button>
+  <div id="bootError"></div>
+</div>
+
+<div id="panel">
+  <h2>Mapping model <span class="collapse" id="collapseBtn">▾</span></h2>
+  <div id="panelBody">
+    <div class="btnrow" id="modeRow">
+      <button data-mode="direct">Direct</button>
+      <button data-mode="perDisplay">Per-display</button>
+      <button data-mode="relative">Relative</button>
+    </div>
+
+    <h2>Simulated displays</h2>
+    <div class="btnrow" id="presetRow">
+      <button data-preset="laptop_ultrawide">Laptop + Ultrawide</button>
+      <button data-preset="dual27">Dual 27″</button>
+      <button data-preset="triple">Triple</button>
+    </div>
+
+    <h2>Tuning</h2>
+    <div id="sliderHost"></div>
+
+    <div class="toggle-row"><input type="checkbox" id="mirror"><label for="mirror">Mirror camera</label></div>
+    <div class="toggle-row"><input type="checkbox" id="showVideo"><label for="showVideo">Show webcam feed</label></div>
+    <div class="toggle-row"><input type="checkbox" id="showSkeleton"><label for="showSkeleton">Show hand skeleton</label></div>
+    <div class="toggle-row"><input type="checkbox" id="accurateModel"><label for="accurateModel">Accurate model (slower — raises FPS when off)</label></div>
+
+    <button id="resetBtn">Reset windows &amp; defaults</button>
+
+    <div id="stats">
+      <div class="stat"><span>Gesture</span><b><span class="pill idle" id="s_gesture">—</span></b></div>
+      <div class="stat"><span>Mapping</span><b id="s_mode">—</b></div>
+      <div class="stat"><span>Active display</span><b id="s_active">—</b></div>
+      <div class="stat"><span>Pointer on</span><b id="s_ptrdisp">—</b></div>
+      <div class="stat"><span>Hand X / Y</span><b id="s_hand">—</b></div>
+      <div class="stat"><span>Fingers</span><b id="s_fingers">—</b></div>
+      <div class="stat"><span>Detect FPS</span><b id="s_fps">—</b></div>
+    </div>
+  </div>
+</div>
+
+<div id="hint">
+  <b>Pinch</b> to grab a window (drag across displays too) · <b>4 fingers + sweep</b> → jump to next display ·
+  <b>Fist</b> → clutch: freeze pointer, reposition your arm, open hand to re-engage.<br>
+  In <b>Per-display</b> mode, dwell at a screen edge to hand off to the neighbor.
+  <kbd>H</kbd> help · <kbd>P</kbd> panel · <kbd>1/2/3</kbd> mapping model.
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script>
+"use strict";
+
+/* ==========================================================================
+   1. TUNABLE CONSTANTS — one place. Defaults seeded with Ronak's tuned Phase 1
+   values, plus the multi-display knobs.
+   ========================================================================== */
+const DEFAULTS = {
+  // Carried over from Phase 1 (tuned by feel):
+  posAlpha:      0.35,   // pointer easing per 60fps render frame (smooth vs latency)
+  pinchAlpha:    0.50,   // pinch-distance signal smoothing
+  pinchThresh:   0.42,   // normalized thumb-index distance below which pinch engages
+  pinchHyst:     0.12,   // release requires distance > thresh + this
+  margin:        0.15,   // input dead-zone at frame edges (usable hand range)
+  swipeDist:     0.16,   // normalized-x hand travel to fire a 4-finger swipe
+  swipeMaxTime:  500,    // ms window that travel must occur within
+  swipeCooldown: 1650,   // ms lockout after a swipe
+  palmMinFingers:3,      // fingers extended to arm a swipe
+  extendThresh:  1.08,   // tip-to-wrist vs pip-to-wrist ratio to count as extended
+
+  // Phase 1.5 — multi-display mapping:
+  edgeDwell:     260,    // ms of dwell at a screen edge before per-display hand-off
+  relGain:       1.4,    // relative mode: sweep distance in display-widths at speed~0
+  relAccel:      1.5,    // relative mode: extra gain per unit hand speed (accel curve)
+
+  // Toggles:
+  mirror:        true,
+  showVideo:     false,  // Ronak runs with the feed off
+  showSkeleton:  true,
+  accurateModel: false,  // false = lite model (faster); flip on to compare
+};
+const CFG = { ...DEFAULTS };
+
+// Slider specs: [key, label, min, max, step, unit]. Panel is built from this.
+const SLIDER_SPECS = [
+  ['posAlpha',      'Position smoothing (α)',   0.05, 1,    0.01, ''],
+  ['margin',        'Edge margin (dead-zone)',  0,    0.4,  0.01, ''],
+  ['pinchThresh',   'Pinch threshold',          0.15, 1.2,  0.01, ''],
+  ['pinchHyst',     'Pinch release hysteresis', 0,    0.4,  0.01, ''],
+  ['swipeDist',     'Swipe travel distance',    0.05, 0.5,  0.01, ''],
+  ['swipeCooldown', 'Swipe cooldown',           200,  2000, 50,   'ms'],
+  ['palmMinFingers','Swipe min fingers',        3,    4,    1,    ''],
+  ['extendThresh',  'Finger extended threshold',1.0,  2.2,  0.02, ''],
+  ['edgeDwell',     'Edge dwell → hand-off',    120,  700,  10,   'ms'],
+  ['relGain',       'Relative gain (×display)', 0.4,  3.0,  0.05, ''],
+  ['relAccel',      'Relative accel',           0,    4,    0.1,  ''],
+];
+
+/* ==========================================================================
+   2. Canvas + world (simulated-display) coordinate system
+   --------------------------------------------------------------------------
+   Displays live in a "world" coordinate space measured in virtual pixels — the
+   same idea as macOS's global display coordinate space (union of NSScreen
+   frames). We fit that world into the canvas with a single scale+offset so we
+   can draw and hit-test everything in world coords and only convert at draw
+   time. Phase 2's real version replaces `displays` with NSScreen frames; the
+   mapping math below is identical.
+   ========================================================================== */
+const video  = document.getElementById('webcam');
+const canvas = document.getElementById('stage');
+const ctx    = canvas.getContext('2d');
+const boot   = document.getElementById('boot');
+const startBtn = document.getElementById('startBtn');
+const bootErr  = document.getElementById('bootError');
+
+let CW = 0, CH = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+function resizeCanvas() {
+  CW = window.innerWidth; CH = window.innerHeight;
+  canvas.width = Math.round(CW*DPR); canvas.height = Math.round(CH*DPR);
+  canvas.style.width = CW+'px'; canvas.style.height = CH+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  recomputeWorldFit();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// --- Display presets (world virtual pixels). Gap = physical bezel/space. ---
+const GAP = 120;
+function preset(name) {
+  if (name === 'dual27') {
+    return [
+      { name: '27″ #1', x: 0,          y: 0, w: 2560, h: 1440 },
+      { name: '27″ #2', x: 2560 + GAP, y: 0, w: 2560, h: 1440 },
+    ];
+  }
+  if (name === 'triple') {
+    return [
+      { name: 'Laptop',  x: 0,                       y: 229, w: 1512, h: 982  },
+      { name: 'Center',  x: 1512 + GAP,              y: 0,   w: 2560, h: 1440 },
+      { name: 'Right',   x: 1512 + GAP + 2560 + GAP, y: 0,   w: 2560, h: 1440 },
+    ];
+  }
+  // laptop_ultrawide (default)
+  return [
+    { name: 'Laptop',    x: 0,           y: 229, w: 1512, h: 982  }, // 14" MBP-ish
+    { name: 'Ultrawide', x: 1512 + GAP,  y: 0,   w: 3440, h: 1440 },
+  ];
+}
+let presetName = 'laptop_ultrawide';
+let displays = preset(presetName);
+
+// World bounding box + canvas fit transform.
+let world = { minX:0, minY:0, maxX:1, maxY:1, w:1, h:1, scale:1, ox:0, oy:0 };
+function recomputeWorldFit() {
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const d of displays) { minX=Math.min(minX,d.x); minY=Math.min(minY,d.y); maxX=Math.max(maxX,d.x+d.w); maxY=Math.max(maxY,d.y+d.h); }
+  const w = maxX-minX, h = maxY-minY;
+  const pad = 80;
+  const scale = Math.min((CW-2*pad)/w, (CH-2*pad)/h);
+  world = { minX, minY, maxX, maxY, w, h, scale,
+            ox: (CW - w*scale)/2 - minX*scale,
+            oy: (CH - h*scale)/2 - minY*scale };
+}
+function wx2sx(x) { return world.ox + x*world.scale; }
+function wy2sy(y) { return world.oy + y*world.scale; }
+function ws(v)    { return v*world.scale; } // world length -> screen length
+
+// Reference display width (for relative-mode gain scaling).
+let refW = 1512;
+
+/* ==========================================================================
+   3. Mock windows (world coords). A couple per display; grab & drag across seams.
+   ========================================================================== */
+let windows = [];
+function makeWindows() {
+  const list = [];
+  const titles = ['Finder','Terminal','Notes','Safari','Mail','Music'];
+  let t = 0;
+  displays.forEach((d, di) => {
+    for (let k = 0; k < 2; k++) {
+      const w = Math.min(560, d.w*0.42), h = Math.min(380, d.h*0.42);
+      list.push({
+        gx: d.x + d.w*(0.1 + k*0.42), gy: d.y + d.h*(0.16 + k*0.30),
+        gw: w, gh: h, title: titles[t % titles.length], hue: (di*70 + k*40 + 200)%360, lift: 0,
+      });
+      t++;
+    }
+  });
+  return list;
+}
+
+/* ==========================================================================
+   4. Hand + pointer + mapping state
+   ========================================================================== */
+const hand = {
+  present:false, lastSeen:0, lastPalmT:0,
+  // fingertip (landmark 8) in NORMALIZED hand space after mirror+margin:
+  hx:0.5, hy:0.5,
+  pinchRaw:1, pinchSmooth:1, pinching:false,
+  extended:0, swiping:false, fist:false,
+  swipeProgress:0, palmHist:[],
+  landmarks:null,        // raw normalized landmarks (for skeleton)
+};
+
+const pointer = {
+  ptx:0, pty:0,          // mapping TARGET in world coords
+  px:0, py:0,            // eased pointer in world coords (what you see)
+  hasPos:false,
+};
+
+// Mapping state machine (per-display + relative share this).
+const map = {
+  activeIdx: 0,
+  scaleX: 1, scaleY: 1, biasX: 0, biasY: 0,   // world = bias + hand_norm * scale
+  clutched: false, clutchFrozen: {gx:0, gy:0},
+  lastHx: null, lastHy: null, lastRelT: 0,     // relative integrator
+  edgeDir: 0, edgeDwellStart: 0, edgePressure: 0,
+  needClutchHint: false,
+};
+let mode = 'perDisplay';
+
+function seedMappingAbsolute(idx) {
+  const d = displays[idx];
+  map.activeIdx = idx;
+  map.scaleX = d.w; map.scaleY = d.h; map.biasX = d.x; map.biasY = d.y;
+  map.clutched = false; map.edgePressure = 0; map.edgeDir = 0; map.needClutchHint = false;
+}
+
+/* ==========================================================================
+   5. Math helpers
+   ========================================================================== */
+function dist3(a,b){ return Math.hypot(a.x-b.x, a.y-b.y, (a.z||0)-(b.z||0)); }
+function clamp(v,lo,hi){ return v<lo?lo:v>hi?hi:v; }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function ema(prev,raw,a){ return prev + a*(raw-prev); }
+function easeK(alpha,dt){ return 1 - Math.pow(1-alpha, dt*60); } // frame-rate-independent
+
+/* Pinch metric: thumb tip(4)↔index tip(8), normalized by hand size wrist(0)↔MCP(9). */
+function computePinch(lm){ return dist3(lm[4],lm[8]) / (dist3(lm[0],lm[9])||1e-6); }
+
+const FINGERS = [ {tip:8,pip:6},{tip:12,pip:10},{tip:16,pip:14},{tip:20,pip:18} ];
+function countExtended(lm){
+  let n=0; const w=lm[0];
+  for (const f of FINGERS) if (dist3(w,lm[f.tip]) > (dist3(w,lm[f.pip])||1e-6)*CFG.extendThresh) n++;
+  return n;
+}
+
+/* Normalized hand position (fingertip), mirrored + margin-remapped to [0,1]. */
+function handNorm(nx, ny){
+  let x = CFG.mirror ? (1-nx) : nx, y = ny;
+  const m = CFG.margin, span = 1 - 2*m;
+  return { hx: clamp((x-m)/span, 0, 1), hy: clamp((y-m)/span, 0, 1) };
+}
+
+// Display adjacency (world space): nearest display sharing vertical overlap.
+function vOverlap(a,b){ return Math.min(a.y+a.h,b.y+b.h) - Math.max(a.y,b.y) > 40; }
+function rightNeighbor(i){
+  let best=-1, bx=Infinity; const a=displays[i];
+  displays.forEach((b,j)=>{ if(j!==i && b.x >= a.x+a.w-2 && vOverlap(a,b) && b.x<bx){bx=b.x;best=j;} });
+  return best;
+}
+function leftNeighbor(i){
+  let best=-1, bx=-Infinity; const a=displays[i];
+  displays.forEach((b,j)=>{ if(j!==i && b.x+b.w <= a.x+2 && vOverlap(a,b) && b.x>bx){bx=b.x;best=j;} });
+  return best;
+}
+function displayAt(gx,gy){
+  for (let i=0;i<displays.length;i++){ const d=displays[i];
+    if (gx>=d.x && gx<=d.x+d.w && gy>=d.y && gy<=d.y+d.h) return i; }
+  return -1;
+}
+
+/* ==========================================================================
+   6. The mapping — hand → pointer(world). The heart of Phase 1.5.
+   ========================================================================== */
+function updateMapping(now){
+  const hx = hand.hx, hy = hand.hy;
+
+  // --- Clutch (fist) applies to per-display + relative modes ---
+  if (mode !== 'direct') {
+    if (hand.fist) {
+      if (!map.clutched){ map.clutched = true; map.clutchFrozen = {gx:pointer.ptx, gy:pointer.pty}; }
+      pointer.ptx = map.clutchFrozen.gx; pointer.pty = map.clutchFrozen.gy;  // frozen
+      map.edgePressure = 0; map.edgeDir = 0;
+      return;
+    } else if (map.clutched) {
+      map.clutched = false; map.needClutchHint = false;
+      if (mode === 'perDisplay') {                 // re-anchor: keep pointer, rebase hand
+        map.biasX = map.clutchFrozen.gx - hx*map.scaleX;
+        map.biasY = map.clutchFrozen.gy - hy*map.scaleY;
+      } else { map.lastHx = hx; map.lastHy = hy; } // relative: avoid a delta jump
+    }
+  }
+
+  if (mode === 'direct') {
+    // Whole hand range spans the entire desktop bounding box. Simple, imprecise.
+    pointer.ptx = world.minX + hx*world.w;
+    pointer.pty = world.minY + hy*world.h;
+    return;
+  }
+
+  if (mode === 'perDisplay') {
+    // Absolute within the ACTIVE display: full hand range = one screen.
+    pointer.ptx = map.biasX + hx*map.scaleX;
+    pointer.pty = map.biasY + hy*map.scaleY;
+    handleEdgeDwell(now);   // dwell at a shared edge → animated hand-off
+    return;
+  }
+
+  // relative: integrate hand DELTA with velocity-adaptive gain (trackpad feel).
+  if (map.lastHx == null){ map.lastHx = hx; map.lastHy = hy; map.lastRelT = now; }
+  const dt = Math.max(1, now - map.lastRelT)/1000; map.lastRelT = now;
+  const dhx = hx - map.lastHx, dhy = hy - map.lastHy;
+  const speed = Math.hypot(dhx,dhy)/dt;
+  const gain = CFG.relGain * refW * (1 + CFG.relAccel*speed);
+  pointer.ptx = clamp(pointer.ptx + dhx*gain, world.minX, world.maxX);
+  pointer.pty = clamp(pointer.pty + dhy*gain, world.minY, world.maxY);
+  map.lastHx = hx; map.lastHy = hy;
+}
+
+/* Per-display hand-off: when the hand pushes to a screen edge that borders a
+   neighbor and dwells there past `edgeDwell` ms, commit the cross. Re-anchor so
+   the hand's current position maps to the neighbor's ENTRY edge; the render-loop
+   easing then glides the pointer across the physical gap (smooth seam). After a
+   hand-off the hand range is spent at that edge — CLUTCH (fist) to recenter and
+   regain reach, exactly like lifting a mouse. */
+function handleEdgeDwell(now){
+  const zone = 0.05;
+  let dir = 0;
+  if (hand.hx > 1-zone && rightNeighbor(map.activeIdx) >= 0) dir = 1;
+  else if (hand.hx < zone && leftNeighbor(map.activeIdx) >= 0) dir = -1;
+  if (dir === 0){ map.edgeDir = 0; map.edgeDwellStart = 0; map.edgePressure = 0; return; }
+  if (map.edgeDir !== dir){ map.edgeDir = dir; map.edgeDwellStart = now; }
+  map.edgePressure = clamp((now - map.edgeDwellStart)/CFG.edgeDwell, 0, 1);
+  if (map.edgePressure >= 1) doHandoff(dir);
+}
+function doHandoff(dir){
+  const ni = dir>0 ? rightNeighbor(map.activeIdx) : leftNeighbor(map.activeIdx);
+  if (ni < 0) return;
+  const N = displays[ni];
+  map.activeIdx = ni; map.scaleX = N.w; map.scaleY = N.h;
+  const entryGX = dir>0 ? N.x : (N.x + N.w);
+  map.biasX = entryGX - hand.hx*map.scaleX;      // current hand → entry edge
+  map.biasY = pointer.pty - hand.hy*map.scaleY;  // keep vertical continuity
+  pointer.ptx = entryGX;                         // set target now (no 1-frame stale)
+  map.edgePressure = 0; map.edgeDir = 0; map.needClutchHint = true;
+  flashSeam(dir);
+}
+
+/* ==========================================================================
+   7. MediaPipe detection
+   ========================================================================== */
+let hands=null, running=false, rafDetect=null;
+let fpsLast=0, fpsEMA=0;
+
+function onResults(res){
+  const now = performance.now();
+  if (fpsLast){ const inst = 1000/Math.max(1, now-fpsLast); fpsEMA = fpsEMA?ema(fpsEMA,inst,0.1):inst; }
+  fpsLast = now;
+
+  const list = res.multiHandLandmarks;
+  if (!list || !list.length){ hand.present=false; hand.landmarks=null; hand.swipeProgress=0; return; }
+  const lm = list[0];
+  hand.present = true; hand.lastSeen = now; hand.landmarks = lm;
+
+  // Fingertip → normalized hand position (the pointer source).
+  const n = handNorm(lm[8].x, lm[8].y);
+  hand.hx = n.hx; hand.hy = n.hy;
+
+  // Pinch (smoothed + hysteresis).
+  hand.pinchRaw = computePinch(lm);
+  hand.pinchSmooth = ema(hand.pinchSmooth, hand.pinchRaw, CFG.pinchAlpha);
+  if (hand.pinching){ if (hand.pinchSmooth > CFG.pinchThresh + CFG.pinchHyst) hand.pinching=false; }
+  else             { if (hand.pinchSmooth < CFG.pinchThresh) hand.pinching=true; }
+
+  // Fingers → swipe arming + fist (clutch).
+  hand.extended = countExtended(lm);
+  hand.swiping = hand.extended >= CFG.palmMinFingers && !hand.pinching;
+  hand.fist    = hand.extended === 0 && !hand.pinching;
+
+  // Swipe travel (palm-center x in the mirrored frame).
+  const pc = [lm[0],lm[5],lm[9],lm[13],lm[17]];
+  let palmX = pc.reduce((s,p)=>s+p.x,0)/pc.length; if (CFG.mirror) palmX = 1-palmX;
+  if (hand.swiping) updateSwipe(palmX, now); else hand.swipeProgress = 0;
+
+  // Update the pointer mapping from this fresh sample.
+  updateMapping(now);
+}
+
+/* 4-finger swipe: displacement over a time window (robust at low FPS). */
+function updateSwipe(x, now){
+  const h = hand.palmHist;
+  if (hand.lastPalmT && now - hand.lastPalmT > 350) h.length = 0; // tolerate low FPS
+  hand.lastPalmT = now;
+  h.push({t:now, x});
+  while (h.length>1 && now - h[0].t > CFG.swipeMaxTime) h.shift();
+  const travel = x - h[0].x;
+  hand.swipeProgress = clamp(travel/CFG.swipeDist, -1, 1);
+  if (now - lastSwipeTime < CFG.swipeCooldown) return;
+  if (Math.abs(travel) >= CFG.swipeDist) fireSwipe(travel>0?1:-1, now);
+}
+let lastSwipeTime = -1e9;
+
+/* Swipe = jump to the adjacent display. Behavior depends on mapping model. */
+function fireSwipe(dir, now){
+  lastSwipeTime = now; hand.palmHist.length = 0; hand.swipeProgress = 0;
+  if (mode === 'perDisplay'){
+    const ni = dir>0 ? rightNeighbor(map.activeIdx) : leftNeighbor(map.activeIdx);
+    if (ni < 0) return;
+    seedMappingAbsolute(ni);          // land on the neighbor with full range
+    flashSeam(dir);
+  } else if (mode === 'relative'){
+    const cur = displayAt(pointer.px, pointer.py);
+    const base = cur>=0 ? cur : map.activeIdx;
+    const ni = dir>0 ? rightNeighbor(base) : leftNeighbor(base);
+    if (ni < 0) return;
+    const N = displays[ni];
+    pointer.ptx = N.x + N.w/2; pointer.pty = N.y + N.h/2; // recenter on neighbor
+    map.lastHx = null;
+    flashSeam(dir);
+  }
+  // direct mode: pointer is glued to absolute hand pos, so swipe is a no-op.
+}
+
+/* ==========================================================================
+   8. Camera pump
+   ========================================================================== */
+async function pump(){
+  if (!running) return;
+  const idle = performance.now() - hand.lastSeen;
+  const throttled = !hand.present && idle > 2500;
+  try { if (video.readyState>=2) await hands.send({image: video}); } catch(e){}
+  if (throttled) setTimeout(()=>{ rafDetect = requestAnimationFrame(pump); }, 120);
+  else rafDetect = requestAnimationFrame(pump);
+}
+
+/* ==========================================================================
+   9. Render loop
+   ========================================================================== */
+let seamFlash = { active:false, dir:0, t:0 };
+function flashSeam(dir){ seamFlash = { active:true, dir, t:performance.now() }; }
+
+const cursorViz = { fill:0, hoverGlow:0, radius:22, clutch:0 };
+let hoveredWindow = null, grabbed = null;
+let lastT = performance.now();
+
+function render(){
+  const now = performance.now();
+  const dt = Math.min(0.05, (now-lastT)/1000); lastT = now;
+  ctx.clearRect(0,0,CW,CH);
+
+  // Seed pointer + easing.
+  if (!pointer.hasPos && hand.present){ pointer.px=pointer.ptx; pointer.py=pointer.pty; pointer.hasPos=true; }
+  if (pointer.hasPos){
+    const k = easeK(CFG.posAlpha, dt);
+    pointer.px += (pointer.ptx - pointer.px)*k;   // 60fps glide (also animates seam hand-offs)
+    pointer.py += (pointer.pty - pointer.py)*k;
+  }
+
+  drawDesk();
+  updateInteraction();
+  for (const w of windows){ const t = (grabbed&&grabbed.win===w)?1:0; w.lift += (t-w.lift)*easeK(0.4,dt); }
+  drawDisplays();
+  drawWindows();
+  drawEdgePressure();
+  drawCursor(dt);
+  if (CFG.showSkeleton && hand.landmarks) drawSkeleton();
+  drawSeamFlash(now);
+
+  updateStats();
+  requestAnimationFrame(render);
+}
+
+function drawDesk(){
+  if (CFG.showVideo && video.readyState>=2){
+    ctx.save(); ctx.globalAlpha=0.18;
+    if (CFG.mirror){ ctx.translate(CW,0); ctx.scale(-1,1); }
+    ctx.drawImage(video,0,0,CW,CH); ctx.restore();
+  }
+  ctx.save(); ctx.strokeStyle='rgba(90,120,160,0.06)'; ctx.lineWidth=1;
+  for (let x=0;x<=CW;x+=48){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CH); ctx.stroke(); }
+  for (let y=0;y<=CH;y+=48){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CW,y); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawDisplays(){
+  displays.forEach((d,i)=>{
+    const x=wx2sx(d.x), y=wy2sy(d.y), w=ws(d.w), h=ws(d.h);
+    const isActive = (mode==='perDisplay') && (i===map.activeIdx);
+    const hasPtr   = displayAt(pointer.px,pointer.py)===i;
+    ctx.save();
+    // Bezel
+    ctx.fillStyle = '#0c1119';
+    roundRect(x-8,y-8,w+16,h+16,10); ctx.fill();
+    // Screen
+    ctx.fillStyle = 'rgba(30,44,62,0.35)';
+    roundRect(x,y,w,h,4); ctx.fill();
+    // Active / pointer highlight
+    if (isActive || hasPtr){
+      ctx.strokeStyle = isActive ? 'rgba(130,255,170,0.9)' : 'rgba(70,209,255,0.7)';
+      ctx.lineWidth = isActive ? 3 : 2;
+      ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 14;
+      roundRect(x,y,w,h,4); ctx.stroke(); ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = 'rgba(90,120,160,0.35)'; ctx.lineWidth=1.5; roundRect(x,y,w,h,4); ctx.stroke();
+    }
+    // Label
+    ctx.fillStyle = isActive ? 'rgba(130,255,170,0.95)' : 'rgba(207,227,242,0.7)';
+    ctx.font = '600 13px -apple-system, sans-serif';
+    ctx.fillText(`${d.name}  ${d.w}×${d.h}${isActive?'  · active':''}`, x+10, y+20);
+    ctx.restore();
+  });
+}
+
+function drawWindows(){
+  for (const w of windows){
+    const isHover = w===hoveredWindow, isGrab = grabbed&&grabbed.win===w, lift=w.lift||0;
+    const x=wx2sx(w.gx), y=wy2sy(w.gy), ww=ws(w.gw), hh=ws(w.gh);
+    ctx.save();
+    if (lift>0.001){ const s=1+0.03*lift, cx=x+ww/2, cy=y+hh/2; ctx.translate(cx,cy); ctx.scale(s,s); ctx.translate(-cx,-cy); }
+    if (isHover||isGrab){ ctx.shadowColor = isGrab?'rgba(255,180,84,0.7)':'rgba(70,209,255,0.6)'; ctx.shadowBlur=(isGrab?26:16)+lift*14; ctx.shadowOffsetY=lift*8; }
+    ctx.fillStyle = `hsla(${w.hue},45%,18%,0.94)`; roundRect(x,y,ww,hh,8); ctx.fill(); ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+    ctx.fillStyle = `hsla(${w.hue},55%,26%,0.96)`; roundRectTop(x,y,ww,Math.min(28,hh*0.16),8); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='600 12px -apple-system, sans-serif'; ctx.textAlign='center';
+    ctx.fillText(w.title, x+ww/2, y+Math.min(19,hh*0.12)); ctx.textAlign='left';
+    if (isHover||isGrab){ ctx.strokeStyle = isGrab?'rgba(255,180,84,0.95)':'rgba(70,209,255,0.9)'; ctx.lineWidth=isGrab?2.5:2; roundRect(x,y,ww,hh,8); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+function updateInteraction(){
+  const gx = pointer.px, gy = pointer.py;
+  if (hand.pinching && !grabbed && hoveredWindow){
+    grabbed = { win:hoveredWindow, offX:gx-hoveredWindow.gx, offY:gy-hoveredWindow.gy };
+  }
+  if (grabbed){
+    if (hand.pinching){ grabbed.win.gx = gx-grabbed.offX; grabbed.win.gy = gy-grabbed.offY; }
+    else grabbed = null;
+  }
+  hoveredWindow = null;
+  if (!grabbed){
+    for (let i=windows.length-1;i>=0;i--){ const w=windows[i];
+      if (gx>=w.gx && gx<=w.gx+w.gw && gy>=w.gy && gy<=w.gy+w.gh){ hoveredWindow=w; break; } }
+  }
+}
+
+function drawEdgePressure(){
+  if (mode!=='perDisplay' || map.edgePressure<=0.01) return;
+  const sx = wx2sx(pointer.px), sy = wy2sy(pointer.py);
+  const dir = map.edgeDir, r = 34;
+  ctx.save();
+  ctx.translate(sx + dir*46, sy);
+  ctx.strokeStyle='rgba(130,255,170,0.35)'; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.arc(0,0,r,-Math.PI/2,-Math.PI/2+2*Math.PI); ctx.stroke();
+  ctx.strokeStyle='rgba(130,255,170,1)'; ctx.shadowColor='rgba(130,255,170,0.8)'; ctx.shadowBlur=10;
+  ctx.beginPath(); ctx.arc(0,0,r,-Math.PI/2,-Math.PI/2+2*Math.PI*map.edgePressure); ctx.stroke();
+  ctx.shadowBlur=0; ctx.fillStyle='rgba(130,255,170,1)'; ctx.font='700 20px -apple-system'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(dir>0?'›':'‹',0,0); ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.restore();
+}
+
+function drawCursor(dt){
+  const k = 1 - Math.pow(0.0001, dt);
+  cursorViz.fill = lerp(cursorViz.fill, hand.pinching?1:0, k);
+  cursorViz.hoverGlow = lerp(cursorViz.hoverGlow, hoveredWindow?1:0, k);
+  cursorViz.clutch = lerp(cursorViz.clutch, (map.clutched?1:0), k);
+  cursorViz.radius = lerp(cursorViz.radius, hand.pinching?12:(hoveredWindow?26:22), k);
+
+  const cx = wx2sx(pointer.px), cy = wy2sy(pointer.py), r = cursorViz.radius;
+  ctx.save();
+  if (!hand.present && performance.now()-hand.lastSeen>400) ctx.globalAlpha=0.25;
+
+  // Clutch look: purple frozen ring.
+  const base={r:70,g:209,b:255}, warm={r:255,g:180,b:84}, clutchC={r:200,g:128,b:255};
+  const mix=cursorViz.fill, cl=cursorViz.clutch;
+  let rr=lerp(base.r,warm.r,mix), gg=lerp(base.g,warm.g,mix), bb=lerp(base.b,warm.b,mix);
+  rr=lerp(rr,clutchC.r,cl); gg=lerp(gg,clutchC.g,cl); bb=lerp(bb,clutchC.b,cl);
+  const col=`rgb(${rr|0},${gg|0},${bb|0})`;
+
+  ctx.shadowColor=col; ctx.shadowBlur=8+cursorViz.hoverGlow*14+cursorViz.fill*10;
+  ctx.strokeStyle=col; ctx.lineWidth=lerp(2,3.5,cursorViz.hoverGlow);
+  if (cl>0.3){ ctx.setLineDash([5,5]); }        // dashed when clutched (frozen)
+  ctx.globalAlpha *= (1 - cursorViz.fill*0.85);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  if (cursorViz.fill>0.02){ ctx.fillStyle=col; ctx.globalAlpha=cursorViz.fill; ctx.beginPath(); ctx.arc(cx,cy,lerp(2,10,cursorViz.fill),0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
+  ctx.shadowBlur=0; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(cx,cy,1.6,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+const HAND_CONNS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+function drawSkeleton(){
+  // Draw the raw hand small in the corner as a reference (normalized → box).
+  const bx=16, by=CH-150, bw=120, bh=134;
+  ctx.save();
+  ctx.fillStyle='rgba(10,16,24,0.7)'; roundRect(bx-6,by-6,bw+12,bh+12,8); ctx.fill();
+  const lm=hand.landmarks;
+  const px=(p)=>{ let x=CFG.mirror?1-p.x:p.x; return bx + x*bw; };
+  const py=(p)=> by + p.y*bh;
+  ctx.strokeStyle = hand.fist?'rgba(200,128,255,0.9)':hand.swiping?'rgba(130,255,170,0.9)':'rgba(70,209,255,0.75)';
+  ctx.lineWidth=2;
+  for (const [a,b] of HAND_CONNS){ ctx.beginPath(); ctx.moveTo(px(lm[a]),py(lm[a])); ctx.lineTo(px(lm[b]),py(lm[b])); ctx.stroke(); }
+  ctx.strokeStyle = hand.pinching?'rgba(255,180,84,1)':'rgba(207,227,242,0.5)'; ctx.lineWidth=hand.pinching?3:1.5;
+  ctx.beginPath(); ctx.moveTo(px(lm[4]),py(lm[4])); ctx.lineTo(px(lm[8]),py(lm[8])); ctx.stroke();
+  ctx.restore();
+}
+
+function drawSeamFlash(now){
+  if (!seamFlash.active) return;
+  const age=now-seamFlash.t, dur=380; if (age>dur){ seamFlash.active=false; return; }
+  const p=age/dur;
+  ctx.save(); ctx.globalAlpha=(1-p)*0.4; ctx.fillStyle='rgba(130,255,170,1)';
+  ctx.font='700 60px -apple-system'; ctx.textAlign='center';
+  ctx.fillText(seamFlash.dir>0?'»':'«', CW/2, 90); ctx.textAlign='left'; ctx.restore();
+}
+
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function roundRectTop(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x,y+h); ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.arcTo(x+w,y,x+w,y+r,r); ctx.lineTo(x+w,y+h); ctx.closePath(); }
+
+/* ==========================================================================
+   10. Stats + panel wiring
+   ========================================================================== */
+const el = id => document.getElementById(id);
+const MODE_LABEL = { direct:'Direct absolute', perDisplay:'Per-display + clutch', relative:'Relative + clutch' };
+function updateStats(){
+  const g=el('s_gesture'); let label='idle', cls='idle';
+  if (!hand.present) { label='no hand'; }
+  else if (map.clutched){ label='clutch (frozen)'; cls='clutch'; }
+  else if (hand.fist)  { label='fist'; cls='clutch'; }
+  else if (hand.pinching){ label='pinch'; cls='pinch'; }
+  else if (hand.swiping) { label='swipe'; cls='palm'; }
+  else if (hoveredWindow){ label='hover'; cls='hover'; }
+  else label='tracking';
+  g.textContent=label; g.className='pill '+cls;
+  el('s_mode').textContent = MODE_LABEL[mode];
+  el('s_active').textContent = (mode==='perDisplay') ? (displays[map.activeIdx]?.name||'—') : 'n/a';
+  const pd = displayAt(pointer.px,pointer.py); el('s_ptrdisp').textContent = pd>=0?displays[pd].name:'(gap)';
+  el('s_hand').textContent = hand.present ? `${hand.hx.toFixed(2)} / ${hand.hy.toFixed(2)}` : '—';
+  el('s_fingers').textContent = hand.present ? `${hand.extended}/4${hand.fist?' · fist':''}` : '—';
+  el('s_fps').textContent = fpsEMA ? fpsEMA.toFixed(0) : '—';
+}
+
+// Build sliders from spec.
+const host = el('sliderHost');
+function fmtVal(spec, v){ return spec[5]==='ms' ? (v+' ms') : (spec[3] < 1 ? (+v).toFixed(2) : String(v)); }
+SLIDER_SPECS.forEach(spec=>{
+  const [key,label,min,max,step,unit]=spec;
+  const row=document.createElement('div'); row.className='row';
+  row.innerHTML = `<label>${label} <span class="val" id="v_${key}"></span></label>`+
+                  `<input type="range" id="sl_${key}" min="${min}" max="${max}" step="${step}">`;
+  host.appendChild(row);
+  const input=row.querySelector('input');
+  const sync=()=>{ input.value=CFG[key]; el('v_'+key).textContent=fmtVal(spec,CFG[key]); };
+  input.addEventListener('input', ()=>{ CFG[key]=parseFloat(input.value); el('v_'+key).textContent=fmtVal(spec,CFG[key]); });
+  spec._sync = sync; sync();
+});
+function syncSliders(){ SLIDER_SPECS.forEach(s=>s._sync()); }
+
+['mirror','showVideo','showSkeleton','accurateModel'].forEach(key=>{
+  const input=el(key); input.checked=CFG[key];
+  input.addEventListener('change', ()=>{ CFG[key]=input.checked; if(key==='accurateModel') applyHandsOptions(); });
+});
+
+// Mode buttons.
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('#modeRow button').forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
+  // Re-seed mapping sensibly for the new mode.
+  const pd = displayAt(pointer.px,pointer.py); const idx = pd>=0?pd:0;
+  if (m==='perDisplay') seedMappingAbsolute(idx);
+  if (m==='relative'){ map.lastHx=null; map.clutched=false; }
+  map.needClutchHint=false;
+}
+document.querySelectorAll('#modeRow button').forEach(b=> b.addEventListener('click',()=>setMode(b.dataset.mode)));
+
+// Preset buttons.
+function setPreset(name){
+  presetName=name; displays=preset(name); refW=displays[0].w;
+  document.querySelectorAll('#presetRow button').forEach(b=>b.classList.toggle('active', b.dataset.preset===name));
+  recomputeWorldFit(); windows=makeWindows();
+  seedMappingAbsolute(0);
+  pointer.ptx = displays[0].x + displays[0].w/2; pointer.pty = displays[0].y + displays[0].h/2;
+  pointer.px=pointer.ptx; pointer.py=pointer.pty; grabbed=null; hoveredWindow=null;
+}
+document.querySelectorAll('#presetRow button').forEach(b=> b.addEventListener('click',()=>setPreset(b.dataset.preset)));
+
+el('resetBtn').addEventListener('click', ()=>{
+  Object.assign(CFG, DEFAULTS); syncSliders();
+  ['mirror','showVideo','showSkeleton','accurateModel'].forEach(k=> el(k).checked=CFG[k]);
+  applyHandsOptions();
+  setPreset('laptop_ultrawide'); setMode('perDisplay');
+});
+
+el('collapseBtn').addEventListener('click', ()=>{
+  const b=el('panelBody'); const hidden=b.style.display==='none';
+  b.style.display=hidden?'':'none'; el('collapseBtn').textContent=hidden?'▾':'▸';
+});
+window.addEventListener('keydown',(e)=>{
+  if (e.key==='h'||e.key==='H'){ const h=el('hint'); h.style.display=h.style.display==='none'?'':'none'; }
+  if (e.key==='p'||e.key==='P'){ const p=el('panel'); p.style.display=p.style.display==='none'?'':'none'; }
+  if (e.key==='1') setMode('direct'); if (e.key==='2') setMode('perDisplay'); if (e.key==='3') setMode('relative');
+});
+
+/* ==========================================================================
+   11. Boot
+   ========================================================================== */
+function applyHandsOptions(){
+  if (!hands) return;
+  hands.setOptions({ maxNumHands:1, modelComplexity: CFG.accurateModel?1:0, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
+}
+async function start(){
+  startBtn.disabled=true; bootErr.textContent='';
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:960}, height:{ideal:540}, facingMode:'user' }, audio:false });
+    video.srcObject=stream; await video.play();
+    if (typeof Hands==='undefined') throw new Error('MediaPipe failed to load (needs the CDN once).');
+    hands = new Hands({ locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}` });
+    applyHandsOptions(); hands.onResults(onResults);
+    running=true; boot.style.display='none';
+    pump(); render();
+  }catch(err){
+    startBtn.disabled=false;
+    bootErr.textContent = (err&&err.message)?err.message:String(err);
+    if (err&&(err.name==='NotAllowedError'||err.name==='NotFoundError')) bootErr.textContent='Camera denied or not found. Allow camera and retry.';
+    console.error(err);
+  }
+}
+startBtn.addEventListener('click', start);
+
+// Initial UI state.
+resizeCanvas();
+setPreset('laptop_ultrawide');
+setMode('perDisplay');
+</script>
+</body>
+</html>

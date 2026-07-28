@@ -1,10 +1,10 @@
 # AirControl
 
-Control macOS windows and virtual desktops with in-air hand gestures captured by the MacBook webcam — no trackpad, no keyboard. Pinch in the air to grab and drag a window; open-palm sweep to switch Spaces. Runs entirely on-device: no cloud, no accounts, no telemetry.
+Control macOS windows and virtual desktops with in-air hand gestures captured by the MacBook webcam — no trackpad, no keyboard. Pinch in the air to grab and drag a window; four-finger sweep to switch windows/Spaces. Runs entirely on-device: no cloud, no accounts, no telemetry.
 
-Built in two phases.
+Built in phases: **Phase 1** (gesture feel) ✅ → **Phase 1.5** (multi-display mapping) ✅ → **Phase 2** (native macOS app).
 
-## Phase 1 — Gesture Feel Prototype ✅ (this commit)
+## Phase 1 — Gesture Feel Prototype ✅
 
 A single self-contained web page for validating hand-tracking accuracy, gesture recognition, coordinate mapping, and cursor-overlay *feel* before any native code is written.
 
@@ -31,6 +31,24 @@ Keyboard: `H` toggles help · `P` toggles the tuning panel.
 All defaults live in one place — the `DEFAULTS` object at the top of the `<script>` in `phase1/index.html` — and each is bound to a panel slider. When the feel is dialed in, these values transfer directly to the Phase 2 Swift `Config`.
 
 **See [`phase1/TUNING.md`](phase1/TUNING.md)** for a full guide: what each parameter does, the symptom → fix table, and starting recipes for smooth dragging vs. precise pointing vs. reliable swipes.
+
+## Phase 1.5 — Multi-Display Mapping Rig ✅
+
+A decision tool: **how should an in-air hand map onto a multi-monitor desktop?** A comfortable hand range is small; the desktop can be very wide. Rather than guess, this rig simulates 2–3 monitors on one screen and lets you *feel* three candidate mapping models side-by-side, then pick one before writing any native `NSScreen`/overlay code in Phase 2.
+
+- **[`phase1.5/index.html`](phase1.5/index.html)** — open in Chrome, grant camera, switch models live from the panel (or keys `1`/`2`/`3`).
+
+Carries over Phase 1's validated feel: index-**fingertip** pointer, 60fps render easing, pinch-to-grab, 4-finger swipe, and the tuned constants.
+
+**Three mapping models to compare:**
+
+1. **Direct absolute** — the hand range spans the *whole* desktop bounding box. Baseline, so you can feel exactly why naive absolute mapping is too imprecise on a wide setup.
+2. **Per-display + clutch** *(the README's chosen model)* — the hand maps absolutely within the **active display** (full precision, one screen's worth of range). Cross to a neighbor by **dwelling at the shared edge** (an edge-pressure meter fills, then an animated hand-off glides the pointer across the physical gap and re-anchors so your hand's position = the new display's entry edge). Or **4-finger swipe** to jump straight to the next display. **Make a fist to clutch**: freezes the pointer so you can reposition your arm, then open your hand to re-engage — exactly like lifting a mouse to recenter.
+3. **Relative + clutch** — trackpad style: the pointer moves by hand *delta* with velocity-adaptive gain (slow = fine, fast = coarse). Spans all monitors with no seam logic; fist to clutch/reposition.
+
+**Simulated layouts:** Laptop + Ultrawide (asymmetric, vertically offset — the hard case), Dual 27″, and Triple. Displays live in a virtual "world" coordinate space that stands in for macOS's global display coordinates; the mapping math is identical to what Phase 2 will use against real `NSScreen` frames.
+
+**What to report back:** which model feels right (or which blend), and tuned values for edge-dwell time and relative gain. That decision drives the Phase 2 mapping implementation.
 
 ## Phase 2 — Native macOS App (not yet built)
 
