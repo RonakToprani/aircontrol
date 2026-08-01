@@ -1,38 +1,59 @@
 import AppKit
 import QuartzCore
 
-/// A borderless, click-through window covering one screen. Draws the
-/// AirControl cursor (ring → hover highlight → pinch dot), two mock windows
-/// for validating drag feel before real AX window-moving lands (M3), the
-/// swipe progress bar, and a status line. The cursor, drag anchor, and any
-/// grabbed window are eased toward their latest targets every render frame
-/// via CADisplayLink — the Phase 1 two-rate smoothness architecture.
+/// Two borderless, click-through windows covering one screen:
+/// - a Space-BOUND content window holding the mock windows, so they behave
+///   like real windows — stay on their desktop through a Space switch and
+///   never fade (real AX windows inherit this for free in M3);
+/// - an all-Spaces HUD window with the AirControl cursor (ring → hover
+///   highlight → pinch dot), swipe progress bar, and status line, which
+///   follows the user across Spaces and fades during the switch animation.
+/// The cursor, drag anchor, and any grabbed window are eased toward their
+/// latest targets every render frame via CADisplayLink — the Phase 1
+/// two-rate smoothness architecture.
 final class OverlayController {
-    private var window: NSWindow?
+    private var hudWindow: NSWindow?
+    private var contentWindow: NSWindow?
     private let view: OverlayView
 
     init(screen: NSScreen, configProvider: @escaping () -> Config) {
+        func makeWindow(_ contentView: NSView, allSpaces: Bool) -> NSWindow {
+            let w = NSWindow(contentRect: screen.frame,
+                             styleMask: .borderless,
+                             backing: .buffered,
+                             defer: false)
+            w.level = .screenSaver
+            w.ignoresMouseEvents = true
+            w.backgroundColor = .clear
+            w.isOpaque = false
+            w.hasShadow = false
+            w.collectionBehavior = allSpaces
+                ? [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+                : [.stationary, .fullScreenAuxiliary, .ignoresCycle]
+            w.contentView = contentView
+            return w
+        }
+
+        let mockHostView = NSView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        mockHostView.wantsLayer = true
+        contentWindow = makeWindow(mockHostView, allSpaces: false)
+
         view = OverlayView(frame: NSRect(origin: .zero, size: screen.frame.size),
-                           configProvider: configProvider)
-        let w = NSWindow(contentRect: screen.frame,
-                         styleMask: .borderless,
-                         backing: .buffered,
-                         defer: false)
-        w.level = .screenSaver
-        w.ignoresMouseEvents = true
-        w.backgroundColor = .clear
-        w.isOpaque = false
-        w.hasShadow = false
-        w.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
-        w.contentView = view
-        window = w
+                           configProvider: configProvider,
+                           mockHost: mockHostView.layer!)
+        hudWindow = makeWindow(view, allSpaces: true)
     }
 
-    func show() { window?.orderFrontRegardless() }
+    func show() {
+        contentWindow?.orderFrontRegardless()
+        hudWindow?.orderFrontRegardless() // after content, so the HUD draws on top
+    }
 
     func close() {
-        window?.orderOut(nil)
-        window = nil
+        hudWindow?.orderOut(nil)
+        hudWindow = nil
+        contentWindow?.orderOut(nil)
+        contentWindow = nil
     }
 
     func update(state: GestureState) { view.apply(state) }
@@ -105,6 +126,7 @@ private final class MockWindowLayer: CALayer {
 
 final class OverlayView: NSView {
     private let configProvider: () -> Config
+    private let mockHost: CALayer // the Space-bound content window's layer
 
     // Latest state from the gesture engine (detection rate).
     private var state = GestureState()
@@ -134,8 +156,9 @@ final class OverlayView: NSView {
 
     private let ringRadius: CGFloat = 18
 
-    init(frame: NSRect, configProvider: @escaping () -> Config) {
+    init(frame: NSRect, configProvider: @escaping () -> Config, mockHost: CALayer) {
         self.configProvider = configProvider
+        self.mockHost = mockHost
         super.init(frame: frame)
         wantsLayer = true
 
@@ -146,7 +169,7 @@ final class OverlayView: NSView {
         browser.center = CGPoint(x: frame.width * 0.68, y: frame.height * 0.42)
         browser.target = browser.center
         mockWindows = [notes, browser]
-        mockWindows.forEach { layer?.addSublayer($0) }
+        mockWindows.forEach { mockHost.addSublayer($0) }
 
         ring.path = CGPath(ellipseIn: CGRect(x: -ringRadius, y: -ringRadius,
                                              width: ringRadius * 2, height: ringRadius * 2), transform: nil)
@@ -265,8 +288,7 @@ final class OverlayView: NSView {
                 grabOffset = CGPoint(x: win.center.x - a.x, y: win.center.y - a.y)
                 mockWindows.removeAll { $0 === win } // move to top
                 mockWindows.append(win)
-                layer?.addSublayer(win)
-                [ring, swipeBarBack, swipeFlash, statusLabel].forEach { layer?.addSublayer($0) }
+                mockHost.addSublayer(win) // HUD lives in its own window above
             }
         }
         if !state.pinching { grabbed = nil }
