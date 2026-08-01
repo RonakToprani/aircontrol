@@ -2,7 +2,7 @@
 
 Control macOS windows and virtual desktops with in-air hand gestures captured by the MacBook webcam — no trackpad, no keyboard. Pinch in the air to grab and drag a window; four-finger sweep to switch windows/Spaces. Runs entirely on-device: no cloud, no accounts, no telemetry.
 
-Built in phases: **Phase 1** (gesture feel) ✅ → **Phase 1.5** (multi-display mapping) ✅ → **Phase 2** (native macOS app).
+Built in phases: **Phase 1** (gesture feel) ✅ → **Phase 1.5** (multi-display mapping) ⚠️ inconclusive → **Phase 2** (native macOS app — see **[PLAN.md](PLAN.md)**).
 
 ## Phase 1 — Gesture Feel Prototype ✅
 
@@ -32,7 +32,9 @@ All defaults live in one place — the `DEFAULTS` object at the top of the `<scr
 
 **See [`phase1/TUNING.md`](phase1/TUNING.md)** for a full guide: what each parameter does, the symptom → fix table, and starting recipes for smooth dragging vs. precise pointing vs. reliable swipes.
 
-## Phase 1.5 — Multi-Display Mapping Rig ✅
+## Phase 1.5 — Multi-Display Mapping Rig ⚠️
+
+> **Status: inconclusive.** In practice the rig felt bad, but a post-mortem found the causes were implementation defects (a fist-clutch that reads as a pinch, edge-dwell hand-offs with no lockout, the knuckle drag-driver dropped, ~7fps detection, tiny simulated monitors) — not evidence against any mapping model. The mapping decision moves to a bake-off on real displays inside the native app; see **[PLAN.md](PLAN.md)** §1 and §5. The rig is kept below for reference.
 
 A decision tool: **how should an in-air hand map onto a multi-monitor desktop?** A comfortable hand range is small; the desktop can be very wide. Rather than guess, this rig simulates 2–3 monitors on one screen and lets you *feel* three candidate mapping models side-by-side, then pick one before writing any native `NSScreen`/overlay code in Phase 2.
 
@@ -50,29 +52,11 @@ Carries over Phase 1's validated feel: index-**fingertip** pointer, 60fps render
 
 **What to report back:** which model feels right (or which blend), and tuned values for edge-dwell time and relative gain. That decision drives the Phase 2 mapping implementation.
 
-## Phase 2 — Native macOS App (not yet built)
+## Phase 2 — Native macOS App
 
-A Swift menu-bar app carrying over the tuned constants: `AVFoundation` capture → Vision `VNDetectHumanHandPoseRequest` for landmarks → Accessibility API (`AXUIElement`) to move real windows → `CGEvent` for Space switching. Per-display click-through overlay windows and live window-under-pointer highlighting.
+**The full implementation plan lives in [PLAN.md](PLAN.md).** In short: a menu-bar-only Swift app (`MenuBarExtra` dropdown with an on/off toggle, calibration, tuning HUD, settings) — `AVFoundation` capture → Vision `VNDetectHumanHandPoseRequest` for landmarks → per-screen click-through overlay windows with 60fps render-easing → Accessibility API (`AXUIElement`) to move real windows → `CGEvent` for Space switching.
 
-### Multi-monitor pointer mapping (design)
-
-The hard problem on a multi-monitor setup: a comfortable in-air hand range is small, but the desktop can be very wide. Mapping the whole hand range across the full multi-display bounding box (naive absolute mapping) destroys precision — a twitch throws the pointer across three screens. Mapping it to one display makes the others unreachable.
-
-**Chosen approach: per-display absolute mapping + a clutched, animated hand-off at monitor seams.** This matches the "remap each time you jump monitors, but keep it smooth" idea.
-
-1. **Absolute within the active display.** The calibrated comfortable hand range (from the pinch-corner calibration) maps 1:1 to the *current* display's bounds only. Full precision, predictable "point where you mean" feel — you get the whole hand range for one screen instead of spreading it thin across all of them.
-
-2. **Push-to-cross hand-off (the clutch).** Displays know their neighbors from the arrangement topology (`NSScreen.frame` in the global coordinate space — handles horizontal, vertical, and offset/mismatched-size layouts). When the pointer reaches an edge that borders another display and the hand keeps pushing past it, it must clear an **edge-pressure threshold** — travel a bit beyond the edge *or* dwell against it for a few frames (hysteresis) — before the hand-off commits. That gate stops accidental screen jumps. Committing the cross **re-anchors** the mapping so the hand's current position now corresponds to the *entry edge* of the new display. Re-anchoring is the clutch: each monitor effectively gets the full hand range, so you never run out of reach mid-desktop.
-
-3. **Smooth seam transition.** During a hand-off the pointer is briefly *animated* across the physical gap between the two displays (a short eased tween, matched to the overlay's existing cursor animation) rather than teleporting, and y is aligned to where the pointer was so it doesn't jump vertically when displays are offset. Reads as one continuous glide across the seam.
-
-4. **Optional explicit clutch gesture.** A dedicated "freeze" gesture (candidate: closed fist, or a held two-finger pause) that pins the pointer so you can recenter your arm without moving it — exactly like lifting a mouse off the desk — then re-engage. Useful for long reaches and as a manual way to settle before a precise grab. To be prototyped for feel before committing.
-
-**Alternative kept in reserve — pure relative / trackpad mode:** pointer moves by hand *delta* with velocity-adaptive gain (slow = fine, fast = coarse), clutch = fist-and-reposition. Spans all monitors with zero seam logic, but loses the absolute point-where-you-look feel. Offer as a toggle if the absolute+hand-off model feels too constrained in testing.
-
-Calibration feeds this directly: the pinch-at-top-left / pinch-at-bottom-right step sets the comfortable hand range that maps to *each* display, and is re-runnable from the menu bar.
-
-> Worth prototyping the seam hand-off + clutch feel in the Phase 1 web rig first — a single wide canvas can simulate two side-by-side "monitors" so the interaction is validated before writing the `NSScreen`/overlay plumbing. Say the word and I'll add it.
+Multi-monitor mapping is decided by a live bake-off on the real dual-display setup (PLAN.md §5): **continuous absolute across the gap-collapsed desktop** (whole desktop in one comfortable hand range — minimal hand travel, zero seams) vs. **per-display absolute with corrected edge crossing** (pointer-gated push-through with lockout, and anchor-recentering decay instead of a clutch gesture). The fist clutch is dropped from v1 — it collides with pinch detection by construction.
 
 Out of scope for Phase 2 v1: multi-user profiles, custom gesture training, iOS companion, window resizing (move only), anything requiring network access.
 
