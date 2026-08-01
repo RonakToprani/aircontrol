@@ -1,0 +1,113 @@
+import AppKit
+import SwiftUI
+
+/// Floating tuning panel: every Config field as a live slider plus the live
+/// readouts that explain *why* a gesture isn't triggering — the Phase 1
+/// tuning workflow, in-app.
+final class TuningPanelController: NSObject, NSWindowDelegate {
+    var onClose: (() -> Void)?
+    private let panel: NSPanel
+
+    @MainActor
+    init(store: ConfigStore, app: AppState) {
+        let size = NSSize(width: 340, height: 620)
+        let screen = NSScreen.main ?? NSScreen.screens[0]
+        let origin = NSPoint(x: screen.visibleFrame.maxX - size.width - 16,
+                             y: screen.visibleFrame.maxY - size.height - 16)
+        panel = NSPanel(contentRect: NSRect(origin: origin, size: size),
+                        styleMask: [.titled, .closable, .resizable, .utilityWindow, .nonactivatingPanel],
+                        backing: .buffered,
+                        defer: false)
+        panel.title = "AirControl tuning"
+        panel.level = .floating
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.contentView = NSHostingView(rootView: TuningView(store: store, app: app))
+        super.init()
+        panel.delegate = self
+    }
+
+    func show() { panel.orderFrontRegardless() }
+
+    func close() {
+        panel.delegate = nil
+        panel.close()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onClose?()
+    }
+}
+
+struct TuningView: View {
+    @ObservedObject var store: ConfigStore
+    @ObservedObject var app: AppState
+
+    var body: some View {
+        Form {
+            Section("Pointer") {
+                slider("Position smoothing (posAlpha)", $store.config.posAlpha, 0.1...0.8, "%.2f")
+                slider("1€ steadiness floor (minCutoff)", $store.config.oneEuroMinCutoff, 0.2...3.0, "%.2f",
+                       help: "Lower = steadier when still, but lazier")
+                slider("1€ speed response (beta)", $store.config.oneEuroBeta, 0...10, "%.1f",
+                       help: "Higher = less lag on fast moves")
+                slider("Edge margin", $store.config.margin, 0.05...0.3, "%.2f")
+            }
+            Section("Pinch") {
+                slider("Signal smoothing (pinchAlpha)", $store.config.pinchAlpha, 0.1...0.9, "%.2f")
+                slider("Threshold", $store.config.pinchThresh, 0.2...0.8, "%.2f")
+                slider("Release hysteresis", $store.config.pinchHyst, 0.02...0.3, "%.2f")
+            }
+            Section("4-finger swipe") {
+                slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")
+                slider("Time window (ms)", $store.config.swipeMaxTimeMS, 250...1000, "%.0f")
+                slider("Cooldown (ms)", $store.config.swipeCooldownMS, 200...2000, "%.0f")
+                Stepper("Min fingers: \(store.config.swipeMinFingers)",
+                        value: $store.config.swipeMinFingers, in: 3...4)
+                slider("Finger extended threshold", $store.config.extendThresh, 1.0...1.6, "%.2f")
+            }
+            Section("Live readouts") {
+                readout("Detect FPS", String(format: "%.0f", app.stats.fps))
+                readout("Pinch dist (raw / smooth)",
+                        String(format: "%.2f / %.2f", app.stats.pinchRaw, app.stats.pinchSmooth))
+                readout("Gesture", app.stats.pinching ? "PINCH" : (app.stats.swiping ? "palm armed" : "point"))
+                readout("Fingers extended", "\(app.stats.extendedCount)/4")
+                HStack {
+                    Text("Swipe progress")
+                    Spacer()
+                    ProgressView(value: abs(app.stats.swipeProgress))
+                        .frame(width: 120)
+                }
+            }
+            Section {
+                Button("Reset to tuned defaults") { store.resetToDefaults() }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func slider(_ label: String, _ value: Binding<Double>,
+                        _ range: ClosedRange<Double>, _ fmt: String,
+                        help: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(label).font(.caption)
+                Spacer()
+                Text(String(format: fmt, value.wrappedValue))
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: range)
+            if let help {
+                Text(help).font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func readout(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value).monospacedDigit().foregroundStyle(.secondary)
+        }
+    }
+}

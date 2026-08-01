@@ -152,6 +152,15 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         wristFilter.reset()
     }
 
+    /// Live-tunable 1€ parameters (called from the tuning panel).
+    func setFilterParams(minCutoff: Double, beta: Double) {
+        queue.async {
+            for f in [self.indexTipFilter, self.indexMCPFilter, self.thumbTipFilter, self.wristFilter] {
+                f.setParams(minCutoff: minCutoff, beta: beta)
+            }
+        }
+    }
+
     /// Vision → canonical coords: Vision is normalized with origin bottom-left
     /// and the buffer is NOT mirrored, so flip x to get mirror-mode behavior
     /// (hand moves right → pointer moves right).

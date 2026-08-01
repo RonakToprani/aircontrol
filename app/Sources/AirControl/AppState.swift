@@ -14,39 +14,64 @@ final class AppState: ObservableObject {
     @Published var showPreview = false {
         didSet { updatePreview() }
     }
-    @Published private(set) var detectFPS: Double = 0
+    @Published var showTuning = false {
+        didSet { updateTuning() }
+    }
+    @Published private(set) var stats = GestureState()
     @Published private(set) var handVisible = false
     @Published private(set) var cameraError: String?
 
+    let configStore = ConfigStore()
+
     private let tracker = HandTracker()
+    private let engine = GestureEngine()
     private var overlay: OverlayController?
     private var preview: PreviewController?
+    private var tuning: TuningPanelController?
     private var lastUIUpdate: CFTimeInterval = 0
+    private var cancellables: Set<AnyCancellable> = []
+
+    private init() {
+        // Keep the tracker's 1€ filters in sync with the tuning sliders.
+        configStore.$config
+            .removeDuplicates { $0.oneEuroMinCutoff == $1.oneEuroMinCutoff && $0.oneEuroBeta == $1.oneEuroBeta }
+            .sink { [weak self] c in
+                self?.tracker.setFilterParams(minCutoff: c.oneEuroMinCutoff, beta: c.oneEuroBeta)
+            }
+            .store(in: &cancellables)
+    }
 
     var statusLine: String {
         if let error = cameraError { return "⚠︎ \(error)" }
         if !enabled { return "Off" }
         if !handVisible { return "On — no hand detected" }
-        return String(format: "Tracking · %.0f detections/sec", detectFPS)
+        return String(format: "Tracking · %.0f detections/sec", stats.fps)
     }
 
     private func start() {
         cameraError = nil
-        let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0])
+        let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
+                                        configProvider: { [configStore] in configStore.config })
         self.overlay = overlay
         overlay.show()
 
         tracker.onFrame = { [weak self] frame in
             DispatchQueue.main.async {
                 guard let self, self.enabled else { return }
-                self.overlay?.update(frame: frame)
+                let state = self.engine.process(frame, config: self.configStore.config,
+                                                now: CACurrentMediaTime())
+                self.overlay?.update(state: state)
                 self.preview?.update(joints: frame?.joints)
-                // Throttle menu-facing published state to ~4 Hz.
+
+                // Menu/panel-facing published state, throttled to ~10 Hz —
+                // except gesture edges, which publish immediately.
                 let now = CACurrentMediaTime()
-                if now - self.lastUIUpdate > 0.25 {
+                if now - self.lastUIUpdate > 0.1
+                    || state.pinching != self.stats.pinching
+                    || state.swipeEvent != nil {
                     self.lastUIUpdate = now
-                    self.handVisible = frame != nil
-                    if let f = frame { self.detectFPS = f.fps }
+                    self.stats = state
+                    self.handVisible = state.handVisible
                 }
             }
         }
@@ -58,6 +83,7 @@ final class AppState: ObservableObject {
                     self.enabled = false
                 } else {
                     self.updatePreview()
+                    self.updateTuning()
                 }
             }
         }
@@ -69,8 +95,9 @@ final class AppState: ObservableObject {
         overlay?.close()
         overlay = nil
         handVisible = false
-        detectFPS = 0
+        stats = GestureState()
         updatePreview()
+        updateTuning()
     }
 
     /// The preview panel exists only while enabled AND requested — the camera
@@ -88,6 +115,22 @@ final class AppState: ObservableObject {
         } else if !enabled || !showPreview, let p = preview {
             preview = nil
             p.close()
+        }
+    }
+
+    private func updateTuning() {
+        if enabled, showTuning, tuning == nil {
+            let t = TuningPanelController(store: configStore, app: self)
+            t.onClose = { [weak self] in
+                guard let self else { return }
+                self.tuning = nil
+                self.showTuning = false
+            }
+            tuning = t
+            t.show()
+        } else if !enabled || !showTuning, let t = tuning {
+            tuning = nil
+            t.close()
         }
     }
 }

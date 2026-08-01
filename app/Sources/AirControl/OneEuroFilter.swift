@@ -65,6 +65,13 @@ final class PointFilter {
         CGPoint(x: fx.filter(p.x, at: t), y: fy.filter(p.y, at: t))
     }
 
+    func setParams(minCutoff: Double, beta: Double) {
+        fx.minCutoff = minCutoff
+        fy.minCutoff = minCutoff
+        fx.beta = beta
+        fy.beta = beta
+    }
+
     func reset() {
         fx.reset()
         fy.reset()

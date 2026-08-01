@@ -11,6 +11,8 @@ struct AirControlApp: App {
             Divider()
             Toggle("Show hand preview", isOn: $state.showPreview)
                 .disabled(!state.enabled)
+            Toggle("Show tuning panel", isOn: $state.showTuning)
+                .disabled(!state.enabled)
             Divider()
             Button("Quit AirControl") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
