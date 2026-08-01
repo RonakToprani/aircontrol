@@ -67,6 +67,10 @@ struct TuningView: View {
                 Stepper("Min fingers: \(store.config.swipeMinFingers)",
                         value: $store.config.swipeMinFingers, in: 3...4)
                 slider("Finger extended threshold", $store.config.extendThresh, 1.0...1.6, "%.2f")
+                slider("Straightness", $store.config.swipeStraightness, 0.3...1.0, "%.2f",
+                       help: "Higher = one clean stroke required; waves that double back are rejected")
+                slider("Max vertical drift", $store.config.swipeMaxVertRatio, 0.2...2.0, "%.2f",
+                       help: "Lower = stroke must be level; arcs and diagonal moves are rejected")
             }
             Section("Spaces") {
                 Toggle("Swipe switches Spaces (⌃←/⌃→)", isOn: $store.config.switchSpaces)

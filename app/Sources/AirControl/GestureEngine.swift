@@ -25,7 +25,7 @@ struct GestureState {
 final class GestureEngine {
     private var pinchSmooth: Double?
     private var pinching = false
-    private var palmHist: [(t: CFTimeInterval, x: Double)] = []
+    private var palmHist: [(t: CFTimeInterval, x: Double, y: Double)] = []
     private var lastPalmT: CFTimeInterval = 0
     private var lastSwipeTime: CFTimeInterval = -1e9
     private var lastSeen: CFTimeInterval = 0
@@ -129,13 +129,25 @@ final class GestureEngine {
             let palmPoints = Self.palmJoints.compactMap { f.joints[$0] }
             if !palmPoints.isEmpty {
                 let palmX = palmPoints.reduce(0) { $0 + $1.x } / CGFloat(palmPoints.count)
+                let palmY = palmPoints.reduce(0) { $0 + $1.y } / CGFloat(palmPoints.count)
                 if now - lastPalmT > palmGapReset { palmHist.removeAll() }
                 lastPalmT = now
-                palmHist.append((t: now, x: palmX))
+                palmHist.append((t: now, x: Double(palmX), y: Double(palmY)))
                 while palmHist.count > 1, now - palmHist[0].t > config.swipeMaxTimeMS / 1000 {
                     palmHist.removeFirst()
                 }
-                let travel = Double(palmHist[palmHist.count - 1].x - palmHist[0].x)
+                let travel = palmHist[palmHist.count - 1].x - palmHist[0].x
+                // A swipe is ONE straight horizontal stroke; a wave doubles
+                // back (net ≪ path) and arcs vertically. Gate on both.
+                var pathX = 0.0
+                for i in 1..<palmHist.count { pathX += abs(palmHist[i].x - palmHist[i - 1].x) }
+                let netY = abs(palmHist[palmHist.count - 1].y - palmHist[0].y)
+                let straight = abs(travel) >= pathX * config.swipeStraightness
+                let horizontal = netY <= max(abs(travel), 0.02) * config.swipeMaxVertRatio
+                guard straight, horizontal else {
+                    s.swipeProgress = 0
+                    return s
+                }
                 s.swipeProgress = min(max(travel / config.swipeDist, -1), 1)
                 if now - lastSwipeTime >= config.swipeCooldownMS / 1000,
                    abs(travel) >= config.swipeDist {

@@ -23,6 +23,8 @@ struct Config: Codable, Equatable {
     var swipeCooldownMS: Double = 1650 // lockout so one sweep fires once
     var swipeMinFingers: Int = 3       // extended fingers required to arm
     var extendThresh: Double = 1.08    // tip-vs-PIP wrist-distance ratio = "extended"
+    var swipeStraightness: Double = 0.7  // net x-travel ÷ total x-path — rejects back-and-forth waves
+    var swipeMaxVertRatio: Double = 0.6  // max vertical drift ÷ horizontal travel — rejects arcs
 
     // Spaces (M4 pulled forward)
     var switchSpaces: Bool = true      // fired swipe posts ⌃←/⌃→ (needs Accessibility)
@@ -49,6 +51,8 @@ struct Config: Codable, Equatable {
         swipeCooldownMS = (try? c.decode(Double.self, forKey: .swipeCooldownMS)) ?? d.swipeCooldownMS
         swipeMinFingers = (try? c.decode(Int.self, forKey: .swipeMinFingers)) ?? d.swipeMinFingers
         extendThresh = (try? c.decode(Double.self, forKey: .extendThresh)) ?? d.extendThresh
+        swipeStraightness = (try? c.decode(Double.self, forKey: .swipeStraightness)) ?? d.swipeStraightness
+        swipeMaxVertRatio = (try? c.decode(Double.self, forKey: .swipeMaxVertRatio)) ?? d.swipeMaxVertRatio
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
         swipeNatural = (try? c.decode(Bool.self, forKey: .swipeNatural)) ?? d.swipeNatural
         postSwipeSettleMS = (try? c.decode(Double.self, forKey: .postSwipeSettleMS)) ?? d.postSwipeSettleMS
