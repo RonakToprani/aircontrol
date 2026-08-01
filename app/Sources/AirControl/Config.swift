@@ -10,6 +10,7 @@ struct Config: Codable, Equatable {
     var oneEuroMinCutoff: Double = 1.0 // 1€: smoothing floor (lower = steadier at rest)
     var oneEuroBeta: Double = 2.0      // 1€: speed responsiveness (higher = less lag when fast)
     var margin: Double = 0.15          // camera-edge dead-zone fraction
+    var pointerAtKnuckle: Bool = true  // cursor tracks index MCP instead of fingertip
 
     // Pinch
     var pinchAlpha: Double = 0.50      // pinch-signal EMA (higher = more responsive)
@@ -22,6 +23,36 @@ struct Config: Codable, Equatable {
     var swipeCooldownMS: Double = 1650 // lockout so one sweep fires once
     var swipeMinFingers: Int = 3       // extended fingers required to arm
     var extendThresh: Double = 1.08    // tip-vs-PIP wrist-distance ratio = "extended"
+
+    // Spaces (M4 pulled forward)
+    var switchSpaces: Bool = true      // fired swipe posts ⌃←/⌃→ (needs Accessibility)
+    var swipeNatural: Bool = true      // hand pushes the desktop: move right → Space on the left
+    var postSwipeSettleMS: Double = 1000 // freeze pointer + gestures while the slide animates
+
+    init() {}
+
+    /// Every field decodes independently with its default as fallback, so a
+    /// config saved by an older build (missing newer keys) keeps its values.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Config()
+        posAlpha = (try? c.decode(Double.self, forKey: .posAlpha)) ?? d.posAlpha
+        oneEuroMinCutoff = (try? c.decode(Double.self, forKey: .oneEuroMinCutoff)) ?? d.oneEuroMinCutoff
+        oneEuroBeta = (try? c.decode(Double.self, forKey: .oneEuroBeta)) ?? d.oneEuroBeta
+        margin = (try? c.decode(Double.self, forKey: .margin)) ?? d.margin
+        pointerAtKnuckle = (try? c.decode(Bool.self, forKey: .pointerAtKnuckle)) ?? d.pointerAtKnuckle
+        pinchAlpha = (try? c.decode(Double.self, forKey: .pinchAlpha)) ?? d.pinchAlpha
+        pinchThresh = (try? c.decode(Double.self, forKey: .pinchThresh)) ?? d.pinchThresh
+        pinchHyst = (try? c.decode(Double.self, forKey: .pinchHyst)) ?? d.pinchHyst
+        swipeDist = (try? c.decode(Double.self, forKey: .swipeDist)) ?? d.swipeDist
+        swipeMaxTimeMS = (try? c.decode(Double.self, forKey: .swipeMaxTimeMS)) ?? d.swipeMaxTimeMS
+        swipeCooldownMS = (try? c.decode(Double.self, forKey: .swipeCooldownMS)) ?? d.swipeCooldownMS
+        swipeMinFingers = (try? c.decode(Int.self, forKey: .swipeMinFingers)) ?? d.swipeMinFingers
+        extendThresh = (try? c.decode(Double.self, forKey: .extendThresh)) ?? d.extendThresh
+        switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
+        swipeNatural = (try? c.decode(Bool.self, forKey: .swipeNatural)) ?? d.swipeNatural
+        postSwipeSettleMS = (try? c.decode(Double.self, forKey: .postSwipeSettleMS)) ?? d.postSwipeSettleMS
+    }
 }
 
 @MainActor

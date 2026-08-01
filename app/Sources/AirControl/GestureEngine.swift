@@ -6,7 +6,7 @@ import Vision
 /// `pointer`/`anchor` are normalized [0,1] AFTER the edge-margin remap.
 struct GestureState {
     var handVisible = false
-    var pointer: CGPoint = .zero   // index fingertip — what the cursor tracks
+    var pointer: CGPoint = .zero   // what the cursor tracks (fingertip or MCP per config)
     var anchor: CGPoint = .zero    // index MCP knuckle — what a drag tracks
     var pinchRaw: Double = 0
     var pinchSmooth: Double = 0
@@ -15,6 +15,7 @@ struct GestureState {
     var swiping = false
     var swipeProgress: Double = 0  // signed −1…+1 toward firing
     var swipeEvent: Int?           // fired this frame: −1 left, +1 right
+    var settling = false           // riding out the Space-switch animation
     var fps: Double = 0
 }
 
@@ -28,6 +29,9 @@ final class GestureEngine {
     private var lastPalmT: CFTimeInterval = 0
     private var lastSwipeTime: CFTimeInterval = -1e9
     private var lastSeen: CFTimeInterval = 0
+    private var settleUntil: CFTimeInterval = 0
+    private var frozenPointer: CGPoint?
+    private var frozenAnchor: CGPoint?
 
     /// Palm-gone gap that re-arms the swipe history. Well above one missed
     /// frame so a brief dropout mid-sweep doesn't wipe the gesture.
@@ -60,8 +64,25 @@ final class GestureEngine {
         lastSeen = now
         s.handVisible = true
         s.fps = f.fps
-        s.pointer = remap(f.indexTip, margin: config.margin)
+        s.pointer = remap(config.pointerAtKnuckle ? f.indexMCP : f.indexTip,
+                          margin: config.margin)
         s.anchor = remap(f.indexMCP, margin: config.margin)
+
+        // --- Post-switch settle: while macOS animates the Space slide, the
+        // hand is still finishing the swipe — freeze the pointer and suppress
+        // every gesture so the transition can't be disturbed or look jittery.
+        if now < settleUntil {
+            s.settling = true
+            s.pointer = frozenPointer ?? s.pointer
+            s.anchor = frozenAnchor ?? s.anchor
+            pinching = false
+            pinchSmooth = nil
+            palmHist.removeAll()
+            s.pinching = false
+            return s
+        }
+        frozenPointer = s.pointer
+        frozenAnchor = s.anchor
 
         // --- Pinch: thumb-tip↔index-tip, normalized by hand size (wrist ↔
         // middle MCP — roughly constant for a hand regardless of pose) so it
@@ -111,6 +132,9 @@ final class GestureEngine {
                     palmHist.removeAll()
                     s.swipeProgress = 0
                     s.swipeEvent = travel > 0 ? 1 : -1
+                    if config.switchSpaces {
+                        settleUntil = now + config.postSwipeSettleMS / 1000
+                    }
                 }
             }
         } else {

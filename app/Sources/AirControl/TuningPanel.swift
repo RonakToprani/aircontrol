@@ -46,6 +46,8 @@ struct TuningView: View {
     var body: some View {
         Form {
             Section("Pointer") {
+                Toggle("Cursor at knuckle (index MCP)", isOn: $store.config.pointerAtKnuckle)
+                    .font(.caption)
                 slider("Position smoothing (posAlpha)", $store.config.posAlpha, 0.1...0.8, "%.2f")
                 slider("1€ steadiness floor (minCutoff)", $store.config.oneEuroMinCutoff, 0.2...3.0, "%.2f",
                        help: "Lower = steadier when still, but lazier")
@@ -65,6 +67,30 @@ struct TuningView: View {
                 Stepper("Min fingers: \(store.config.swipeMinFingers)",
                         value: $store.config.swipeMinFingers, in: 3...4)
                 slider("Finger extended threshold", $store.config.extendThresh, 1.0...1.6, "%.2f")
+            }
+            Section("Spaces") {
+                Toggle("Swipe switches Spaces (⌃←/⌃→)", isOn: $store.config.switchSpaces)
+                    .font(.caption)
+                Toggle("Natural direction (hand pushes the desktop)", isOn: $store.config.swipeNatural)
+                    .font(.caption)
+                HStack {
+                    Text("Accessibility")
+                    Spacer()
+                    Text(app.accessibilityOK ? "granted" : "NOT GRANTED")
+                        .foregroundStyle(app.accessibilityOK ? .secondary : Color.orange)
+                }
+                if !app.accessibilityOK {
+                    Text("The system prompt only opens Settings — you must flip the AirControl toggle there yourself.")
+                        .font(.caption2).foregroundStyle(.orange)
+                    Button("Open Accessibility settings") { SpaceSwitcher.openSystemSettings() }
+                }
+                slider("Post-switch freeze (ms)", $store.config.postSwipeSettleMS, 0...2000, "%.0f",
+                       help: "Pointer + gestures pause while the Space slides")
+                HStack {
+                    Button("Test ⟵") { SpaceSwitcher.post(direction: -1) }
+                    Spacer()
+                    Button("Test ⟶") { SpaceSwitcher.post(direction: 1) }
+                }
             }
             Section("Live readouts") {
                 readout("Detect FPS", String(format: "%.0f", app.stats.fps))

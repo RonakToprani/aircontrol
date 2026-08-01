@@ -219,7 +219,8 @@ final class OverlayView: NSView {
         anchorTarget = CGPoint(x: s.anchor.x * bounds.width, y: s.anchor.y * bounds.height)
         if let event = s.swipeEvent {
             swipeFlashTime = CACurrentMediaTime()
-            swipeFlash.string = event > 0 ? "Space  ⟶" : "⟵  Space"
+            let dir = configProvider().swipeNatural ? -event : event
+            swipeFlash.string = dir > 0 ? "Space  ⟶" : "⟵  Space"
         }
     }
 
@@ -281,7 +282,7 @@ final class OverlayView: NSView {
         }
         if let p = pointer {
             ring.position = p
-            ring.opacity = handFresh ? 1 : 0.25
+            ring.opacity = handFresh ? (state.settling ? 0.35 : 1) : 0.25
             if state.pinching {
                 ring.fillColor = NSColor.systemTeal.withAlphaComponent(0.85).cgColor
                 ring.transform = CATransform3DMakeScale(0.65, 0.65, 1)

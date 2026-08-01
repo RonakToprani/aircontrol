@@ -20,6 +20,11 @@ final class AppState: ObservableObject {
     @Published private(set) var stats = GestureState()
     @Published private(set) var handVisible = false
     @Published private(set) var cameraError: String?
+    @Published private(set) var accessibilityOK = true
+
+    var needsAccessibility: Bool {
+        enabled && configStore.config.switchSpaces && !accessibilityOK
+    }
 
     let configStore = ConfigStore()
 
@@ -29,6 +34,7 @@ final class AppState: ObservableObject {
     private var preview: PreviewController?
     private var tuning: TuningPanelController?
     private var lastUIUpdate: CFTimeInterval = 0
+    private var lastAXCheck: CFTimeInterval = 0
     private var cancellables: Set<AnyCancellable> = []
 
     private init() {
@@ -50,6 +56,9 @@ final class AppState: ObservableObject {
 
     private func start() {
         cameraError = nil
+        if configStore.config.switchSpaces {
+            accessibilityOK = SpaceSwitcher.requestTrust()
+        }
         let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
                                         configProvider: { [configStore] in configStore.config })
         self.overlay = overlay
@@ -63,9 +72,20 @@ final class AppState: ObservableObject {
                 self.overlay?.update(state: state)
                 self.preview?.update(joints: frame?.joints)
 
+                if let event = state.swipeEvent, self.configStore.config.switchSpaces {
+                    self.accessibilityOK = SpaceSwitcher.isTrusted
+                    let dir = self.configStore.config.swipeNatural ? -event : event
+                    SpaceSwitcher.post(direction: dir)
+                }
+
                 // Menu/panel-facing published state, throttled to ~10 Hz —
                 // except gesture edges, which publish immediately.
                 let now = CACurrentMediaTime()
+                if now - self.lastAXCheck > 1.0 {
+                    self.lastAXCheck = now
+                    let trusted = SpaceSwitcher.isTrusted
+                    if trusted != self.accessibilityOK { self.accessibilityOK = trusted }
+                }
                 if now - self.lastUIUpdate > 0.1
                     || state.pinching != self.stats.pinching
                     || state.swipeEvent != nil {

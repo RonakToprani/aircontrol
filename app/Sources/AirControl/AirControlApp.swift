@@ -8,6 +8,9 @@ struct AirControlApp: App {
         MenuBarExtra {
             Toggle("Enable AirControl", isOn: $state.enabled)
             Text(state.statusLine)
+            if state.needsAccessibility {
+                Text("⚠︎ Space switching needs Accessibility")
+            }
             Divider()
             Toggle("Show hand preview", isOn: $state.showPreview)
                 .disabled(!state.enabled)
