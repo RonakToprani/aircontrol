@@ -32,6 +32,7 @@ final class GestureEngine {
     private var settleUntil: CFTimeInterval = 0
     private var frozenPointer: CGPoint?
     private var frozenAnchor: CGPoint?
+    private let reentryDur: CFTimeInterval = 0.3
 
     /// Palm-gone gap that re-arms the swipe history. Well above one missed
     /// frame so a brief dropout mid-sweep doesn't wipe the gesture.
@@ -81,8 +82,18 @@ final class GestureEngine {
             s.pinching = false
             return s
         }
-        frozenPointer = s.pointer
-        frozenAnchor = s.anchor
+        // Re-entry: glide from the frozen point to the live hand instead of
+        // teleporting the moment the settle ends.
+        let sinceSettle = now - settleUntil
+        if sinceSettle < reentryDur, let fp = frozenPointer, let fa = frozenAnchor {
+            let t = sinceSettle / reentryDur
+            let e = CGFloat(t * t * (3 - 2 * t)) // smoothstep
+            s.pointer = lerp(fp, s.pointer, e)
+            s.anchor = lerp(fa, s.anchor, e)
+        } else {
+            frozenPointer = s.pointer
+            frozenAnchor = s.anchor
+        }
 
         // --- Pinch: thumb-tip↔index-tip, normalized by hand size (wrist ↔
         // middle MCP — roughly constant for a hand regardless of pose) so it
@@ -153,5 +164,9 @@ final class GestureEngine {
 
     private func dist(_ a: CGPoint, _ b: CGPoint) -> Double {
         Double(hypot(a.x - b.x, a.y - b.y))
+    }
+
+    private func lerp(_ a: CGPoint, _ b: CGPoint, _ t: CGFloat) -> CGPoint {
+        CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t)
     }
 }

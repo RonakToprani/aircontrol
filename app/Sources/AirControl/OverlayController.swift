@@ -233,6 +233,14 @@ final class OverlayView: NSView {
         let now = CACurrentMediaTime()
         let handFresh = state.handVisible && (now - lastSeen) < 0.3
 
+        // Hide the whole overlay while a Space switch animates — the settle
+        // freeze keeps state sane, but anything drawn during the slide reads
+        // as chop. Quick ease out, ease back in when the settle ends.
+        if let w = window {
+            let target: CGFloat = state.settling ? 0 : 1
+            w.alphaValue += (target - w.alphaValue) * (state.settling ? 0.35 : 0.15)
+        }
+
         // Frame-rate-independent easing (posAlpha defined per 60fps frame).
         let dt = max(link.targetTimestamp - link.timestamp, 1.0 / 240.0)
         let k = 1 - pow(1 - CGFloat(config.posAlpha), CGFloat(dt * 60))
