@@ -53,6 +53,18 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
         mover.onLatency = { [weak self] ms in self?.axLatencyMS = ms }
+
+        // The engine's pointer-freeze is keyed to macOS actually switching
+        // Spaces — never to the swipe gesture, which may switch nothing.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { // observer queue is .main
+                guard let self, self.enabled else { return }
+                self.engine.beginSettle(duration: self.configStore.config.postSwipeSettleMS / 1000)
+            }
+        }
     }
 
     var statusLine: String {

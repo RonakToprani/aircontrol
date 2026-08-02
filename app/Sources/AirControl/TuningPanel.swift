@@ -73,6 +73,9 @@ struct TuningView: View {
                        help: "Higher = one clean stroke required; waves that double back are rejected")
                 slider("Max vertical drift", $store.config.swipeMaxVertRatio, 0.2...2.0, "%.2f",
                        help: "Lower = stroke must be level; arcs and diagonal moves are rejected")
+                slider("Arm: hold-still time (ms)", $store.config.swipeArmMS, 50...500, "%.0f",
+                       help: "Pause your open palm this long to arm; waves never pause, so never arm")
+                slider("Arm: max drift while holding", $store.config.swipeArmMaxSpeed, 0.1...1.0, "%.2f")
             }
             Section("Windows") {
                 Toggle("Practice on mock windows", isOn: $store.config.useMockWindows)
@@ -111,7 +114,9 @@ struct TuningView: View {
                 readout("Detect FPS", String(format: "%.0f", app.stats.fps))
                 readout("Pinch dist (raw / smooth)",
                         String(format: "%.2f / %.2f", app.stats.pinchRaw, app.stats.pinchSmooth))
-                readout("Gesture", app.stats.pinching ? "PINCH" : (app.stats.swiping ? "palm armed" : "point"))
+                readout("Gesture", app.stats.pinching ? "PINCH"
+                    : app.stats.swiping ? (app.stats.swipeArmed ? "palm ARMED" : "palm — arming…")
+                    : "point")
                 readout("Fingers extended", "\(app.stats.extendedCount)/4")
                 HStack {
                     Text("Swipe progress")

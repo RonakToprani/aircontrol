@@ -265,7 +265,14 @@ final class OverlayView: NSView {
         super.removeFromSuperview()
     }
 
-    func noteSpaceChange() { spaceChangeTime = CACurrentMediaTime() }
+    func noteSpaceChange() {
+        spaceChangeTime = CACurrentMediaTime()
+        // The old Space's windows are gone from under the pointer — drop any
+        // hover target so its outline can't linger on the new Space.
+        hoveredTarget = nil
+        latestHover = nil
+        ghost.opacity = 0
+    }
 
     /// Called on the main queue at detection rate with the engine's output.
     func apply(_ s: GestureState) {
@@ -376,10 +383,14 @@ final class OverlayView: NSView {
     /// ghost outline is the 60fps feedback while AX writes trail at whatever
     /// rate the target app absorbs.
     private func stepRealWindows(config: Config, now: CFTimeInterval, handFresh: Bool) {
+        if state.settling {
+            hoveredTarget = nil
+            latestHover = nil
+        }
         // Hover: throttled async window-under-pointer query + sticky targeting
         // (once targeted, a window keeps the target until the pointer clearly
         // exits its frame — jitter can never flick the target at grab time).
-        if grabbedTarget == nil, handFresh, let p = pointer {
+        if grabbedTarget == nil, handFresh, !state.settling, let p = pointer {
             if now - lastHoverQuery > 0.12 {
                 lastHoverQuery = now
                 mover.queryWindow(at: cgPoint(fromView: p)) { [weak self] t in
@@ -470,7 +481,9 @@ final class OverlayView: NSView {
 
         // --- Status line.
         if state.fps > 0 {
-            let gesture = state.pinching ? "PINCH" : (state.swiping ? "PALM \(state.extendedCount)/4" : "point")
+            let gesture = state.pinching ? "PINCH"
+                : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM — hold still to arm")
+                : "point"
             statusLabel.string = String(format: "AirControl M3 · %.0f fps · %@%@",
                                         state.fps, gesture, handFresh ? "" : " · no hand")
         } else {

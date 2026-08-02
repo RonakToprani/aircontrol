@@ -13,6 +13,7 @@ struct GestureState {
     var pinching = false
     var extendedCount = 0
     var swiping = false
+    var swipeArmed = false         // palm paused long enough — stroke will count
     var swipeProgress: Double = 0  // signed −1…+1 toward firing
     var swipeEvent: Int?           // fired this frame: −1 left, +1 right
     var settling = false           // riding out the Space-switch animation
@@ -33,6 +34,17 @@ final class GestureEngine {
     private var frozenPointer: CGPoint?
     private var frozenAnchor: CGPoint?
     private let reentryDur: CFTimeInterval = 0.3
+    private var armedSince: CFTimeInterval?
+    private var stillSince: CFTimeInterval?
+    private var lastPalm: (t: CFTimeInterval, x: Double, y: Double)?
+
+    /// Called (from AppState) when macOS reports the active Space actually
+    /// changed — freeze the pointer and suppress gestures while it animates.
+    /// Keyed to the real event, never to the gesture, so a swipe that
+    /// switches nothing can't freeze anything.
+    func beginSettle(duration: CFTimeInterval) {
+        settleUntil = max(settleUntil, CACurrentMediaTime() + duration)
+    }
 
     /// Palm-gone gap that re-arms the swipe history. Well above one missed
     /// frame so a brief dropout mid-sweep doesn't wipe the gesture.
@@ -124,44 +136,74 @@ final class GestureEngine {
         s.extendedCount = extended
         s.swiping = extended >= config.swipeMinFingers && !pinching
 
-        // --- Swipe: net palm-center displacement over a time window.
+        // --- Swipe: arm-then-stroke. A deliberate swipe starts from a
+        // momentary pause (present the palm, then stroke); a wave is
+        // continuous motion that never pauses, so it never arms. Once armed,
+        // net palm displacement over a time window fires the swipe, still
+        // gated on straightness + horizontality.
         if s.swiping {
             let palmPoints = Self.palmJoints.compactMap { f.joints[$0] }
             if !palmPoints.isEmpty {
-                let palmX = palmPoints.reduce(0) { $0 + $1.x } / CGFloat(palmPoints.count)
-                let palmY = palmPoints.reduce(0) { $0 + $1.y } / CGFloat(palmPoints.count)
-                if now - lastPalmT > palmGapReset { palmHist.removeAll() }
-                lastPalmT = now
-                palmHist.append((t: now, x: Double(palmX), y: Double(palmY)))
-                while palmHist.count > 1, now - palmHist[0].t > config.swipeMaxTimeMS / 1000 {
-                    palmHist.removeFirst()
-                }
-                let travel = palmHist[palmHist.count - 1].x - palmHist[0].x
-                // A swipe is ONE straight horizontal stroke; a wave doubles
-                // back (net ≪ path) and arcs vertically. Gate on both.
-                var pathX = 0.0
-                for i in 1..<palmHist.count { pathX += abs(palmHist[i].x - palmHist[i - 1].x) }
-                let netY = abs(palmHist[palmHist.count - 1].y - palmHist[0].y)
-                let straight = abs(travel) >= pathX * config.swipeStraightness
-                let horizontal = netY <= max(abs(travel), 0.02) * config.swipeMaxVertRatio
-                guard straight, horizontal else {
-                    s.swipeProgress = 0
-                    return s
-                }
-                s.swipeProgress = min(max(travel / config.swipeDist, -1), 1)
-                if now - lastSwipeTime >= config.swipeCooldownMS / 1000,
-                   abs(travel) >= config.swipeDist {
-                    lastSwipeTime = now
+                let palmX = Double(palmPoints.reduce(0) { $0 + $1.x }) / Double(palmPoints.count)
+                let palmY = Double(palmPoints.reduce(0) { $0 + $1.y }) / Double(palmPoints.count)
+                if now - lastPalmT > palmGapReset {
                     palmHist.removeAll()
-                    s.swipeProgress = 0
-                    s.swipeEvent = travel > 0 ? 1 : -1
-                    if config.switchSpaces {
-                        settleUntil = now + config.postSwipeSettleMS / 1000
+                    armedSince = nil
+                    stillSince = nil
+                    lastPalm = nil
+                }
+                lastPalmT = now
+
+                if armedSince == nil, let lp = lastPalm {
+                    let dt = max(now - lp.t, 1e-3)
+                    let speed = Double(hypot(palmX - lp.x, palmY - lp.y)) / dt
+                    if speed < config.swipeArmMaxSpeed {
+                        if stillSince == nil { stillSince = now }
+                        if now - stillSince! >= config.swipeArmMS / 1000 {
+                            armedSince = now
+                            palmHist.removeAll() // stroke measures from the pause
+                        }
+                    } else {
+                        stillSince = nil
+                    }
+                }
+                lastPalm = (t: now, x: palmX, y: palmY)
+                s.swipeArmed = armedSince != nil
+
+                if armedSince != nil {
+                    palmHist.append((t: now, x: palmX, y: palmY))
+                    while palmHist.count > 1, now - palmHist[0].t > config.swipeMaxTimeMS / 1000 {
+                        palmHist.removeFirst()
+                    }
+                    let travel = palmHist[palmHist.count - 1].x - palmHist[0].x
+                    // A swipe is ONE straight horizontal stroke; a wave doubles
+                    // back (net ≪ path) and arcs vertically. Gate on both.
+                    var pathX = 0.0
+                    for i in 1..<palmHist.count { pathX += abs(palmHist[i].x - palmHist[i - 1].x) }
+                    let netY = abs(palmHist[palmHist.count - 1].y - palmHist[0].y)
+                    let straight = abs(travel) >= pathX * config.swipeStraightness
+                    let horizontal = netY <= max(abs(travel), 0.02) * config.swipeMaxVertRatio
+                    guard straight, horizontal else {
+                        s.swipeProgress = 0
+                        return s
+                    }
+                    s.swipeProgress = min(max(travel / config.swipeDist, -1), 1)
+                    if now - lastSwipeTime >= config.swipeCooldownMS / 1000,
+                       abs(travel) >= config.swipeDist {
+                        lastSwipeTime = now
+                        palmHist.removeAll()
+                        s.swipeProgress = 0
+                        s.swipeEvent = travel > 0 ? 1 : -1
+                        armedSince = nil
+                        stillSince = nil
                     }
                 }
             }
         } else {
             s.swipeProgress = 0 // history ages out; a real gap re-arms it
+            armedSince = nil
+            stillSince = nil
+            lastPalm = nil
         }
 
         return s

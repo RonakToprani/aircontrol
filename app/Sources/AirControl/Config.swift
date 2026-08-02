@@ -26,6 +26,8 @@ struct Config: Codable, Equatable {
     var extendThresh: Double = 1.08    // tip-vs-PIP wrist-distance ratio = "extended"
     var swipeStraightness: Double = 0.8  // net x-travel ÷ total x-path — rejects back-and-forth waves
     var swipeMaxVertRatio: Double = 0.6  // max vertical drift ÷ horizontal travel — rejects arcs
+    var swipeArmMS: Double = 200         // open palm must hold ~still this long to arm the stroke
+    var swipeArmMaxSpeed: Double = 0.35  // palm speed (normalized/s) that still counts as "holding still"
 
     // Real windows (M3)
     var useMockWindows: Bool = false     // practice on mock windows instead of real ones
@@ -60,6 +62,8 @@ struct Config: Codable, Equatable {
         extendThresh = (try? c.decode(Double.self, forKey: .extendThresh)) ?? d.extendThresh
         swipeStraightness = (try? c.decode(Double.self, forKey: .swipeStraightness)) ?? d.swipeStraightness
         swipeMaxVertRatio = (try? c.decode(Double.self, forKey: .swipeMaxVertRatio)) ?? d.swipeMaxVertRatio
+        swipeArmMS = (try? c.decode(Double.self, forKey: .swipeArmMS)) ?? d.swipeArmMS
+        swipeArmMaxSpeed = (try? c.decode(Double.self, forKey: .swipeArmMaxSpeed)) ?? d.swipeArmMaxSpeed
         useMockWindows = (try? c.decode(Bool.self, forKey: .useMockWindows)) ?? d.useMockWindows
         axWriteMinIntervalMS = (try? c.decode(Double.self, forKey: .axWriteMinIntervalMS)) ?? d.axWriteMinIntervalMS
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
