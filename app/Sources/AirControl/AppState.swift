@@ -40,9 +40,12 @@ final class AppState: ObservableObject {
     private init() {
         // Keep the tracker's 1€ filters in sync with the tuning sliders.
         configStore.$config
-            .removeDuplicates { $0.oneEuroMinCutoff == $1.oneEuroMinCutoff && $0.oneEuroBeta == $1.oneEuroBeta }
+            .removeDuplicates { $0.oneEuroMinCutoff == $1.oneEuroMinCutoff
+                && $0.oneEuroBeta == $1.oneEuroBeta
+                && $0.jumpRejectDist == $1.jumpRejectDist }
             .sink { [weak self] c in
                 self?.tracker.setFilterParams(minCutoff: c.oneEuroMinCutoff, beta: c.oneEuroBeta)
+                self?.tracker.setJumpReject(c.jumpRejectDist)
             }
             .store(in: &cancellables)
     }

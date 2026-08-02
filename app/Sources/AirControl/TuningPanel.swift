@@ -54,6 +54,8 @@ struct TuningView: View {
                 slider("1€ speed response (beta)", $store.config.oneEuroBeta, 0...10, "%.1f",
                        help: "Higher = less lag on fast moves")
                 slider("Edge margin", $store.config.margin, 0.05...0.3, "%.2f")
+                slider("Teleport reject distance", $store.config.jumpRejectDist, 0.1...0.6, "%.2f",
+                       help: "1-frame jumps beyond this are treated as misdetections; lower = stricter")
             }
             Section("Pinch") {
                 slider("Signal smoothing (pinchAlpha)", $store.config.pinchAlpha, 0.1...0.9, "%.2f")

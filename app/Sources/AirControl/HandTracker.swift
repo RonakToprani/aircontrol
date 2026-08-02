@@ -27,6 +27,9 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     private let thumbTipFilter = PointFilter()
     private let wristFilter = PointFilter()
     private let trackingGapReset: CFTimeInterval = 0.3
+    private var lastAcceptedWrist: CGPoint?
+    private var pendingJump: CGPoint?
+    private var jumpRejectDist: Double = 0.25
 
     override init() {
         super.init()
@@ -120,7 +123,30 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         let now = CACurrentMediaTime()
         if lastDetectionTime > 0, now - lastDetectionTime > trackingGapReset {
             resetFilters()
+            lastAcceptedWrist = nil
         }
+
+        // Single-frame teleport rejection: a confident-but-wrong detection can
+        // fling the pointer across the screen for one frame (the 1€ filter
+        // passes fast motion through by design). An impossible jump must
+        // persist for two consecutive frames before it's believed.
+        if let last = lastAcceptedWrist {
+            let jump = hypot(wrist.x - last.x, wrist.y - last.y)
+            if Double(jump) > jumpRejectDist {
+                if let pending = pendingJump,
+                   Double(hypot(wrist.x - pending.x, wrist.y - pending.y)) <= jumpRejectDist {
+                    resetFilters() // confirmed relocation — don't smear across it
+                    pendingJump = nil
+                } else {
+                    pendingJump = wrist
+                    onFrame?(nil)
+                    return
+                }
+            } else {
+                pendingJump = nil
+            }
+        }
+        lastAcceptedWrist = wrist
         if lastDetectionTime > 0 {
             let inst = 1.0 / max(now - lastDetectionTime, 0.001)
             fpsEMA = fpsEMA == 0 ? inst : fpsEMA * 0.9 + inst * 0.1
@@ -159,6 +185,10 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
                 f.setParams(minCutoff: minCutoff, beta: beta)
             }
         }
+    }
+
+    func setJumpReject(_ dist: Double) {
+        queue.async { self.jumpRejectDist = dist }
     }
 
     /// Vision → canonical coords: Vision is normalized with origin bottom-left

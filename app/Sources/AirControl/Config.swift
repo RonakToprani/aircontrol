@@ -11,6 +11,7 @@ struct Config: Codable, Equatable {
     var oneEuroBeta: Double = 2.0      // 1€: speed responsiveness (higher = less lag when fast)
     var margin: Double = 0.15          // camera-edge dead-zone fraction
     var pointerAtKnuckle: Bool = true  // cursor tracks index MCP instead of fingertip
+    var jumpRejectDist: Double = 0.25  // 1-frame wrist jump beyond this is a misdetection
 
     // Pinch
     var pinchAlpha: Double = 0.50      // pinch-signal EMA (higher = more responsive)
@@ -43,6 +44,7 @@ struct Config: Codable, Equatable {
         oneEuroBeta = (try? c.decode(Double.self, forKey: .oneEuroBeta)) ?? d.oneEuroBeta
         margin = (try? c.decode(Double.self, forKey: .margin)) ?? d.margin
         pointerAtKnuckle = (try? c.decode(Bool.self, forKey: .pointerAtKnuckle)) ?? d.pointerAtKnuckle
+        jumpRejectDist = (try? c.decode(Double.self, forKey: .jumpRejectDist)) ?? d.jumpRejectDist
         pinchAlpha = (try? c.decode(Double.self, forKey: .pinchAlpha)) ?? d.pinchAlpha
         pinchThresh = (try? c.decode(Double.self, forKey: .pinchThresh)) ?? d.pinchThresh
         pinchHyst = (try? c.decode(Double.self, forKey: .pinchHyst)) ?? d.pinchHyst

@@ -15,6 +15,7 @@ final class OverlayController {
     private var hudWindow: NSWindow?
     private var contentWindow: NSWindow?
     private let view: OverlayView
+    private var spaceObserver: NSObjectProtocol?
 
     init(screen: NSScreen, configProvider: @escaping () -> Config) {
         func makeWindow(_ contentView: NSView, allSpaces: Bool) -> NSWindow {
@@ -42,6 +43,14 @@ final class OverlayController {
                            configProvider: configProvider,
                            mockHost: mockHostView.layer!)
         hudWindow = makeWindow(view, allSpaces: true)
+
+        // Fade the HUD only when a Space switch actually happens (whatever
+        // triggered it) — a swipe that fires on the last Space switches
+        // nothing and must not blank the pointer.
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak view] _ in view?.noteSpaceChange() }
     }
 
     func show() {
@@ -50,6 +59,10 @@ final class OverlayController {
     }
 
     func close() {
+        if let o = spaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(o)
+            spaceObserver = nil
+        }
         hudWindow?.orderOut(nil)
         hudWindow = nil
         contentWindow?.orderOut(nil)
@@ -151,6 +164,7 @@ final class OverlayView: NSView {
     private let swipeBarFill = CALayer()
     private let swipeFlash = CATextLayer()
     private var swipeFlashTime: CFTimeInterval = -1e9
+    private var spaceChangeTime: CFTimeInterval = -1e9
     private let statusLabel = CATextLayer()
     private var link: CADisplayLink?
 
@@ -233,6 +247,8 @@ final class OverlayView: NSView {
         super.removeFromSuperview()
     }
 
+    func noteSpaceChange() { spaceChangeTime = CACurrentMediaTime() }
+
     /// Called on the main queue at detection rate with the engine's output.
     func apply(_ s: GestureState) {
         state = s
@@ -256,12 +272,13 @@ final class OverlayView: NSView {
         let now = CACurrentMediaTime()
         let handFresh = state.handVisible && (now - lastSeen) < 0.3
 
-        // Hide the whole overlay while a Space switch animates — the settle
-        // freeze keeps state sane, but anything drawn during the slide reads
-        // as chop. Quick ease out, ease back in when the settle ends.
+        // Hide the HUD while a Space switch animates — anything drawn during
+        // the slide reads as chop. Keyed to the real activeSpaceDidChange
+        // notification, not the swipe gesture. Quick ease out, gentler ease in.
+        let switching = (now - spaceChangeTime) < config.postSwipeSettleMS / 1000
         if let w = window {
-            let target: CGFloat = state.settling ? 0 : 1
-            w.alphaValue += (target - w.alphaValue) * (state.settling ? 0.35 : 0.15)
+            let target: CGFloat = switching ? 0 : 1
+            w.alphaValue += (target - w.alphaValue) * (switching ? 0.35 : 0.15)
         }
 
         // Frame-rate-independent easing (posAlpha defined per 60fps frame).
