@@ -21,6 +21,7 @@ final class AppState: ObservableObject {
     @Published private(set) var handVisible = false
     @Published private(set) var cameraError: String?
     @Published private(set) var accessibilityOK = true
+    @Published private(set) var axLatencyMS: Double = 0
 
     var needsAccessibility: Bool {
         enabled && configStore.config.switchSpaces && !accessibilityOK
@@ -30,6 +31,7 @@ final class AppState: ObservableObject {
 
     private let tracker = HandTracker()
     private let engine = GestureEngine()
+    private let mover = WindowMover()
     private var overlay: OverlayController?
     private var preview: PreviewController?
     private var tuning: TuningPanelController?
@@ -42,12 +44,15 @@ final class AppState: ObservableObject {
         configStore.$config
             .removeDuplicates { $0.oneEuroMinCutoff == $1.oneEuroMinCutoff
                 && $0.oneEuroBeta == $1.oneEuroBeta
-                && $0.jumpRejectDist == $1.jumpRejectDist }
+                && $0.jumpRejectDist == $1.jumpRejectDist
+                && $0.axWriteMinIntervalMS == $1.axWriteMinIntervalMS }
             .sink { [weak self] c in
                 self?.tracker.setFilterParams(minCutoff: c.oneEuroMinCutoff, beta: c.oneEuroBeta)
                 self?.tracker.setJumpReject(c.jumpRejectDist)
+                self?.mover.setMinWriteInterval(ms: c.axWriteMinIntervalMS)
             }
             .store(in: &cancellables)
+        mover.onLatency = { [weak self] ms in self?.axLatencyMS = ms }
     }
 
     var statusLine: String {
@@ -63,7 +68,8 @@ final class AppState: ObservableObject {
             accessibilityOK = SpaceSwitcher.requestTrust()
         }
         let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
-                                        configProvider: { [configStore] in configStore.config })
+                                        configProvider: { [configStore] in configStore.config },
+                                        mover: mover)
         self.overlay = overlay
         overlay.show()
 

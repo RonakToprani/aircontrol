@@ -74,6 +74,15 @@ struct TuningView: View {
                 slider("Max vertical drift", $store.config.swipeMaxVertRatio, 0.2...2.0, "%.2f",
                        help: "Lower = stroke must be level; arcs and diagonal moves are rejected")
             }
+            Section("Windows") {
+                Toggle("Practice on mock windows", isOn: $store.config.useMockWindows)
+                    .font(.caption)
+                slider("AX write floor (ms)", $store.config.axWriteMinIntervalMS, 16...200, "%.0f",
+                       help: "Minimum gap between window-position writes; slow apps auto-throttle above it")
+                slider("Sticky hover margin (px)", $store.config.stickyHoverPx, 0...50, "%.0f",
+                       help: "Pointer must exit the target window by this much before retargeting")
+                readout("AX write latency", String(format: "%.1f ms", app.axLatencyMS))
+            }
             Section("Spaces") {
                 Toggle("Swipe switches Spaces (⌃←/⌃→)", isOn: $store.config.switchSpaces)
                     .font(.caption)

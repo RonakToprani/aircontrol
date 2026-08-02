@@ -17,7 +17,7 @@ final class OverlayController {
     private let view: OverlayView
     private var spaceObserver: NSObjectProtocol?
 
-    init(screen: NSScreen, configProvider: @escaping () -> Config) {
+    init(screen: NSScreen, configProvider: @escaping () -> Config, mover: WindowMover) {
         func makeWindow(_ contentView: NSView, allSpaces: Bool) -> NSWindow {
             let w = NSWindow(contentRect: screen.frame,
                              styleMask: .borderless,
@@ -41,7 +41,8 @@ final class OverlayController {
 
         view = OverlayView(frame: NSRect(origin: .zero, size: screen.frame.size),
                            configProvider: configProvider,
-                           mockHost: mockHostView.layer!)
+                           mockHost: mockHostView.layer!,
+                           mover: mover)
         hudWindow = makeWindow(view, allSpaces: true)
 
         // Fade the HUD only when a Space switch actually happens (whatever
@@ -140,6 +141,7 @@ private final class MockWindowLayer: CALayer {
 final class OverlayView: NSView {
     private let configProvider: () -> Config
     private let mockHost: CALayer // the Space-bound content window's layer
+    private let mover: WindowMover
 
     // Latest state from the gesture engine (detection rate).
     private var state = GestureState()
@@ -151,10 +153,19 @@ final class OverlayView: NSView {
     private var pointer: CGPoint?
     private var anchor: CGPoint?
 
-    // Drag state.
+    // Drag state (mock windows).
     private var grabbed: MockWindowLayer?
     private var grabOffset: CGPoint = .zero
     private var wasPinching = false
+
+    // Drag state (real windows, M3). Frames in CG coords (top-left origin).
+    private var hoveredTarget: TargetWindow?
+    private var latestHover: TargetWindow?
+    private var lastHoverQuery: CFTimeInterval = 0
+    private var grabbedTarget: TargetWindow?
+    private var grabOffsetCG: CGPoint = .zero
+    private var lastDragOrigin: CGPoint?
+    private let ghost = CAShapeLayer()
 
     // Layers.
     private var mockWindows: [MockWindowLayer] = []
@@ -170,11 +181,18 @@ final class OverlayView: NSView {
 
     private let ringRadius: CGFloat = 18
 
-    init(frame: NSRect, configProvider: @escaping () -> Config, mockHost: CALayer) {
+    init(frame: NSRect, configProvider: @escaping () -> Config, mockHost: CALayer, mover: WindowMover) {
         self.configProvider = configProvider
         self.mockHost = mockHost
+        self.mover = mover
         super.init(frame: frame)
         wantsLayer = true
+
+        ghost.opacity = 0
+        ghost.strokeColor = NSColor.systemTeal.cgColor
+        ghost.fillColor = NSColor.clear.cgColor
+        ghost.lineWidth = 2
+        layer?.addSublayer(ghost)
 
         let notes = MockWindowLayer(title: "Mock window A", size: CGSize(width: 380, height: 250), tint: .systemTeal)
         notes.center = CGPoint(x: frame.width * 0.3, y: frame.height * 0.55)
@@ -299,34 +317,45 @@ final class OverlayView: NSView {
         }
 
         // --- Grab / drag (knuckle-driven, so the pinch curl doesn't lurch it).
-        if state.pinching, !wasPinching, handFresh, let p = pointer, let a = anchor {
-            if let win = mockWindows.last(where: { $0.containsInSuperlayer(p) }) {
-                grabbed = win
-                grabOffset = CGPoint(x: win.center.x - a.x, y: win.center.y - a.y)
-                mockWindows.removeAll { $0 === win } // move to top
-                mockWindows.append(win)
-                mockHost.addSublayer(win) // HUD lives in its own window above
+        let mocksOn = config.useMockWindows
+        mockHost.isHidden = !mocksOn
+        let hoverActive: Bool
+
+        if mocksOn {
+            ghost.opacity = 0
+            if state.pinching, !wasPinching, handFresh, let p = pointer, let a = anchor {
+                if let win = mockWindows.last(where: { $0.containsInSuperlayer(p) }) {
+                    grabbed = win
+                    grabOffset = CGPoint(x: win.center.x - a.x, y: win.center.y - a.y)
+                    mockWindows.removeAll { $0 === win } // move to top
+                    mockWindows.append(win)
+                    mockHost.addSublayer(win) // HUD lives in its own window above
+                }
             }
+            if !state.pinching { grabbed = nil }
+
+            if let win = grabbed, let a = anchor {
+                win.target = CGPoint(x: a.x + grabOffset.x, y: a.y + grabOffset.y)
+            }
+            for win in mockWindows {
+                var c = win.center
+                c.x += (win.target.x - c.x) * k
+                c.y += (win.target.y - c.y) * k
+                win.center = c
+            }
+            let hovered = (handFresh && grabbed == nil && pointer != nil)
+                ? mockWindows.last(where: { $0.containsInSuperlayer(pointer!) }) : nil
+            for win in mockWindows {
+                win.setLook(hovered: win === hovered, grabbed: win === grabbed)
+            }
+            hoverActive = hovered != nil
+        } else {
+            grabbed = nil
+            stepRealWindows(config: config, now: now, handFresh: handFresh)
+            hoverActive = hoveredTarget != nil
         }
-        if !state.pinching { grabbed = nil }
         wasPinching = state.pinching
 
-        if let win = grabbed, let a = anchor {
-            win.target = CGPoint(x: a.x + grabOffset.x, y: a.y + grabOffset.y)
-        }
-        for win in mockWindows {
-            var c = win.center
-            c.x += (win.target.x - c.x) * k
-            c.y += (win.target.y - c.y) * k
-            win.center = c
-        }
-
-        // --- Cursor + hover looks.
-        let hovered = (handFresh && grabbed == nil && pointer != nil)
-            ? mockWindows.last(where: { $0.containsInSuperlayer(pointer!) }) : nil
-        for win in mockWindows {
-            win.setLook(hovered: win === hovered, grabbed: win === grabbed)
-        }
         if let p = pointer {
             ring.position = p
             ring.opacity = handFresh ? (state.settling ? 0.35 : 1) : 0.25
@@ -334,12 +363,98 @@ final class OverlayView: NSView {
                 ring.fillColor = NSColor.systemTeal.withAlphaComponent(0.85).cgColor
                 ring.transform = CATransform3DMakeScale(0.65, 0.65, 1)
             } else {
-                ring.fillColor = NSColor.systemTeal.withAlphaComponent(hovered != nil ? 0.3 : 0.12).cgColor
+                ring.fillColor = NSColor.systemTeal.withAlphaComponent(hoverActive ? 0.3 : 0.12).cgColor
                 ring.transform = CATransform3DIdentity
             }
         }
 
         // --- Swipe progress bar above the cursor.
+        stepSwipeUI(now: now, handFresh: handFresh)
+    }
+
+    /// Real-window hover / grab / drag (M3). All frames in CG coords; the
+    /// ghost outline is the 60fps feedback while AX writes trail at whatever
+    /// rate the target app absorbs.
+    private func stepRealWindows(config: Config, now: CFTimeInterval, handFresh: Bool) {
+        // Hover: throttled async window-under-pointer query + sticky targeting
+        // (once targeted, a window keeps the target until the pointer clearly
+        // exits its frame — jitter can never flick the target at grab time).
+        if grabbedTarget == nil, handFresh, let p = pointer {
+            if now - lastHoverQuery > 0.12 {
+                lastHoverQuery = now
+                mover.queryWindow(at: cgPoint(fromView: p)) { [weak self] t in
+                    self?.latestHover = t
+                }
+            }
+            let pCG = cgPoint(fromView: p)
+            if let hov = hoveredTarget {
+                let m = CGFloat(config.stickyHoverPx)
+                if !hov.frame.insetBy(dx: -m, dy: -m).contains(pCG) {
+                    hoveredTarget = latestHover
+                } else if let fresh = latestHover, fresh.windowID == hov.windowID {
+                    hoveredTarget = fresh // same window — refresh its frame
+                }
+            } else {
+                hoveredTarget = latestHover
+            }
+        } else if !handFresh {
+            hoveredTarget = nil
+            latestHover = nil
+        }
+
+        // Grab on the pinch edge; drag from the eased knuckle anchor.
+        if state.pinching, !wasPinching, handFresh, let t = hoveredTarget, let a = anchor {
+            grabbedTarget = t
+            let aCG = cgPoint(fromView: a)
+            grabOffsetCG = CGPoint(x: t.frame.origin.x - aCG.x, y: t.frame.origin.y - aCG.y)
+            lastDragOrigin = t.frame.origin
+            mover.beginDrag(t)
+        }
+        if !state.pinching, grabbedTarget != nil {
+            mover.endDrag(at: lastDragOrigin) // window commits where dropped
+            grabbedTarget = nil
+        }
+        if let t = grabbedTarget, let a = anchor {
+            let aCG = cgPoint(fromView: a)
+            let origin = CGPoint(x: aCG.x + grabOffsetCG.x, y: aCG.y + grabOffsetCG.y)
+            lastDragOrigin = origin
+            mover.drag(to: origin)
+            drawGhost(viewRect(fromCG: CGRect(origin: origin, size: t.frame.size)), strong: true)
+        } else if let h = hoveredTarget, handFresh {
+            drawGhost(viewRect(fromCG: h.frame), strong: false)
+        } else {
+            ghost.opacity = 0
+        }
+    }
+
+    private func drawGhost(_ r: CGRect, strong: Bool) {
+        ghost.frame = r
+        ghost.path = CGPath(roundedRect: CGRect(origin: .zero, size: r.size),
+                            cornerWidth: 10, cornerHeight: 10, transform: nil)
+        ghost.lineWidth = strong ? 2.5 : 1.5
+        ghost.strokeColor = NSColor.systemTeal.withAlphaComponent(strong ? 0.9 : 0.55).cgColor
+        ghost.fillColor = strong ? NSColor.systemTeal.withAlphaComponent(0.07).cgColor
+                                 : NSColor.clear.cgColor
+        ghost.opacity = 1
+    }
+
+    /// AppKit-global ↔ CG (top-left-origin) conversions, anchored on the
+    /// primary display's height. The view fills its screen exactly.
+    private var primaryHeight: CGFloat { NSScreen.screens.first?.frame.height ?? 0 }
+
+    private func cgPoint(fromView p: CGPoint) -> CGPoint {
+        guard let wf = window?.frame else { return .zero }
+        return CGPoint(x: wf.origin.x + p.x, y: primaryHeight - (wf.origin.y + p.y))
+    }
+
+    private func viewRect(fromCG r: CGRect) -> CGRect {
+        guard let wf = window?.frame else { return .zero }
+        return CGRect(x: r.minX - wf.origin.x,
+                      y: (primaryHeight - r.maxY) - wf.origin.y,
+                      width: r.width, height: r.height)
+    }
+
+    private func stepSwipeUI(now: CFTimeInterval, handFresh: Bool) {
         if let p = pointer, handFresh, state.swiping, abs(state.swipeProgress) > 0.02 {
             swipeBarBack.position = CGPoint(x: p.x, y: p.y + ringRadius + 18)
             swipeBarBack.opacity = 1
@@ -356,10 +471,10 @@ final class OverlayView: NSView {
         // --- Status line.
         if state.fps > 0 {
             let gesture = state.pinching ? "PINCH" : (state.swiping ? "PALM \(state.extendedCount)/4" : "point")
-            statusLabel.string = String(format: "AirControl M1 · %.0f fps · %@%@",
+            statusLabel.string = String(format: "AirControl M3 · %.0f fps · %@%@",
                                         state.fps, gesture, handFresh ? "" : " · no hand")
         } else {
-            statusLabel.string = "AirControl M1 · show your hand to the camera"
+            statusLabel.string = "AirControl M3 · show your hand to the camera"
         }
     }
 }

@@ -27,6 +27,11 @@ struct Config: Codable, Equatable {
     var swipeStraightness: Double = 0.8  // net x-travel ÷ total x-path — rejects back-and-forth waves
     var swipeMaxVertRatio: Double = 0.6  // max vertical drift ÷ horizontal travel — rejects arcs
 
+    // Real windows (M3)
+    var useMockWindows: Bool = false     // practice on mock windows instead of real ones
+    var axWriteMinIntervalMS: Double = 33 // floor between AX position writes; latency adapts above it
+    var stickyHoverPx: Double = 16       // pointer must exit target frame by this before retargeting
+
     // Spaces (M4 pulled forward)
     var switchSpaces: Bool = true      // fired swipe posts ⌃←/⌃→ (needs Accessibility)
     var swipeNatural: Bool = true      // hand pushes the desktop: move right → Space on the left
@@ -55,6 +60,9 @@ struct Config: Codable, Equatable {
         extendThresh = (try? c.decode(Double.self, forKey: .extendThresh)) ?? d.extendThresh
         swipeStraightness = (try? c.decode(Double.self, forKey: .swipeStraightness)) ?? d.swipeStraightness
         swipeMaxVertRatio = (try? c.decode(Double.self, forKey: .swipeMaxVertRatio)) ?? d.swipeMaxVertRatio
+        useMockWindows = (try? c.decode(Bool.self, forKey: .useMockWindows)) ?? d.useMockWindows
+        axWriteMinIntervalMS = (try? c.decode(Double.self, forKey: .axWriteMinIntervalMS)) ?? d.axWriteMinIntervalMS
+        stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
         swipeNatural = (try? c.decode(Bool.self, forKey: .swipeNatural)) ?? d.swipeNatural
         postSwipeSettleMS = (try? c.decode(Double.self, forKey: .postSwipeSettleMS)) ?? d.postSwipeSettleMS
