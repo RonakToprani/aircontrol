@@ -24,13 +24,13 @@ struct Config: Codable, Equatable {
     var swipeCooldownMS: Double = 1650 // lockout so one sweep fires once
     var swipeMinFingers: Int = 3       // extended fingers required to arm
     var extendThresh: Double = 1.08    // tip-vs-PIP wrist-distance ratio = "extended"
-    var swipeStraightness: Double = 0.7  // net x-travel ÷ total x-path — rejects back-and-forth waves
+    var swipeStraightness: Double = 0.8  // net x-travel ÷ total x-path — rejects back-and-forth waves
     var swipeMaxVertRatio: Double = 0.6  // max vertical drift ÷ horizontal travel — rejects arcs
 
     // Spaces (M4 pulled forward)
     var switchSpaces: Bool = true      // fired swipe posts ⌃←/⌃→ (needs Accessibility)
     var swipeNatural: Bool = true      // hand pushes the desktop: move right → Space on the left
-    var postSwipeSettleMS: Double = 1000 // freeze pointer + gestures while the slide animates
+    var postSwipeSettleMS: Double = 1200 // freeze pointer + gestures while the slide animates
 
     init() {}
 
