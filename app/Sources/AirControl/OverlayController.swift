@@ -45,6 +45,15 @@ final class OverlayController {
                            mover: mover)
         hudWindow = makeWindow(view, allSpaces: true)
 
+        // M2: the HUD follows the mapper's active display — in Model B the
+        // pointer only ever exists on one display at a time, so one window
+        // that relocates is exactly the right shape. Mocks stay put.
+        view.onActiveScreenChange = { [weak self] screen in
+            guard let self, let w = self.hudWindow else { return }
+            w.setFrame(screen.frame, display: true)
+            self.view.relayoutStatics()
+        }
+
         // Fade the HUD only when a Space switch actually happens (whatever
         // triggered it) — a swipe that fires on the last Space switches
         // nothing and must not blank the pointer.
@@ -142,6 +151,8 @@ final class OverlayView: NSView {
     private let configProvider: () -> Config
     private let mockHost: CALayer // the Space-bound content window's layer
     private let mover: WindowMover
+    private let mapper = PointerMapper()
+    var onActiveScreenChange: ((NSScreen) -> Void)?
 
     // Latest state from the gesture engine (detection rate).
     private var state = GestureState()
@@ -176,6 +187,14 @@ final class OverlayView: NSView {
     private let swipeFlash = CATextLayer()
     private var swipeFlashTime: CFTimeInterval = -1e9
     private var spaceChangeTime: CFTimeInterval = -1e9
+
+    // M2 seam-crossing UI.
+    private var seamPressure: Double = 0
+    private var seamDX = 0
+    private var seamDY = 0
+    private let seamBarBack = CALayer()
+    private let seamBarFill = CALayer()
+    private let glow = CALayer()
     private let statusLabel = CATextLayer()
     private var link: CADisplayLink?
 
@@ -188,11 +207,25 @@ final class OverlayView: NSView {
         super.init(frame: frame)
         wantsLayer = true
 
+        glow.borderColor = NSColor.systemTeal.withAlphaComponent(0.18).cgColor
+        glow.borderWidth = 3
+        glow.frame = NSRect(origin: .zero, size: frame.size)
+        layer?.addSublayer(glow)
+
         ghost.opacity = 0
         ghost.strokeColor = NSColor.systemTeal.cgColor
         ghost.fillColor = NSColor.clear.cgColor
         ghost.lineWidth = 2
         layer?.addSublayer(ghost)
+
+        seamBarBack.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.18).cgColor
+        seamBarBack.cornerRadius = 3
+        seamBarBack.opacity = 0
+        seamBarFill.backgroundColor = NSColor.systemTeal.cgColor
+        seamBarFill.cornerRadius = 3
+        seamBarFill.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        seamBarBack.addSublayer(seamBarFill)
+        layer?.addSublayer(seamBarBack)
 
         let notes = MockWindowLayer(title: "Mock window A", size: CGSize(width: 380, height: 250), tint: .systemTeal)
         notes.center = CGPoint(x: frame.width * 0.3, y: frame.height * 0.55)
@@ -279,8 +312,19 @@ final class OverlayView: NSView {
         state = s
         guard s.handVisible else { return }
         lastSeen = CACurrentMediaTime()
-        pointerTarget = CGPoint(x: s.pointer.x * bounds.width, y: s.pointer.y * bounds.height)
-        anchorTarget = CGPoint(x: s.anchor.x * bounds.width, y: s.anchor.y * bounds.height)
+        let m = mapper.map(pointerNorm: s.pointer, anchorNorm: s.anchor,
+                           config: configProvider(), now: lastSeen)
+        if m.screenChanged {
+            onActiveScreenChange?(m.screen)
+            pointer = nil // re-seed eased positions in the new window's coords
+            anchor = nil
+        }
+        let origin = window?.frame.origin ?? .zero
+        pointerTarget = CGPoint(x: m.pointer.x - origin.x, y: m.pointer.y - origin.y)
+        anchorTarget = CGPoint(x: m.anchor.x - origin.x, y: m.anchor.y - origin.y)
+        seamPressure = m.pressure
+        seamDX = m.pressureDX
+        seamDY = m.pressureDY
         if let event = s.swipeEvent {
             swipeFlashTime = CACurrentMediaTime()
             let dir = configProvider().swipeNatural ? -event : event
@@ -375,8 +419,41 @@ final class OverlayView: NSView {
             }
         }
 
+        // --- Seam pressure meter (M2): shows crossing progress at the edge
+        // being pushed, at the pointer's height — deliberate push fills it,
+        // casual pointing near the edge barely registers.
+        if seamPressure > 0.02, handFresh, let p = pointer {
+            seamBarBack.opacity = 1
+            let len: CGFloat = 64
+            if seamDX != 0 {
+                seamBarBack.bounds = CGRect(x: 0, y: 0, width: 6, height: len)
+                seamBarBack.position = CGPoint(x: seamDX > 0 ? bounds.width - 10 : 10,
+                                               y: min(max(p.y, len / 2), bounds.height - len / 2))
+                seamBarFill.bounds = CGRect(x: 0, y: 0, width: 6, height: len * CGFloat(seamPressure))
+                seamBarFill.position = CGPoint(x: 3, y: len / 2)
+            } else {
+                seamBarBack.bounds = CGRect(x: 0, y: 0, width: len, height: 6)
+                seamBarBack.position = CGPoint(x: min(max(p.x, len / 2), bounds.width - len / 2),
+                                               y: seamDY > 0 ? bounds.height - 10 : 10)
+                seamBarFill.bounds = CGRect(x: 0, y: 0, width: len * CGFloat(seamPressure), height: 6)
+                seamBarFill.position = CGPoint(x: len / 2, y: 3)
+            }
+        } else {
+            seamBarBack.opacity = 0
+        }
+
         // --- Swipe progress bar above the cursor.
         stepSwipeUI(now: now, handFresh: handFresh)
+    }
+
+    /// Reposition fixed HUD furniture after the window relocates to a display
+    /// with a different size.
+    func relayoutStatics() {
+        let size = window?.frame.size ?? bounds.size
+        setFrameSize(size)
+        glow.frame = CGRect(origin: .zero, size: size)
+        swipeFlash.frame = CGRect(x: size.width / 2 - 150, y: size.height - 120, width: 300, height: 44)
+        statusLabel.frame = CGRect(x: size.width / 2 - 190, y: 24, width: 380, height: 24)
     }
 
     /// Real-window hover / grab / drag (M3). All frames in CG coords; the

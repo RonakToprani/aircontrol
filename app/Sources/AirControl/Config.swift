@@ -29,6 +29,13 @@ struct Config: Codable, Equatable {
     var swipeArmMS: Double = 200         // open palm must hold ~still this long to arm the stroke
     var swipeArmMaxSpeed: Double = 0.35  // palm speed (normalized/s) that still counts as "holding still"
 
+    // Multi-display mapping (M2, PLAN §5.3 Model B)
+    var useModelA: Bool = false        // comparison: hand range → whole desktop instead of active display
+    var crossOvershoot: Double = 0.08  // pointer must push past the seam by this fraction of the display
+    var crossDwellMS: Double = 350     // …or hold any pressure against the seam this long
+    var crossLockoutMS: Double = 500   // same-seam backward re-cross blocked this long (chaining stays free)
+    var anchorDecayRate: Double = 3.0  // how fast the entry-edge anchor recenters, ∝ hand speed
+
     // Real windows (M3)
     var useMockWindows: Bool = false     // practice on mock windows instead of real ones
     var axWriteMinIntervalMS: Double = 33 // floor between AX position writes; latency adapts above it
@@ -64,6 +71,11 @@ struct Config: Codable, Equatable {
         swipeMaxVertRatio = (try? c.decode(Double.self, forKey: .swipeMaxVertRatio)) ?? d.swipeMaxVertRatio
         swipeArmMS = (try? c.decode(Double.self, forKey: .swipeArmMS)) ?? d.swipeArmMS
         swipeArmMaxSpeed = (try? c.decode(Double.self, forKey: .swipeArmMaxSpeed)) ?? d.swipeArmMaxSpeed
+        useModelA = (try? c.decode(Bool.self, forKey: .useModelA)) ?? d.useModelA
+        crossOvershoot = (try? c.decode(Double.self, forKey: .crossOvershoot)) ?? d.crossOvershoot
+        crossDwellMS = (try? c.decode(Double.self, forKey: .crossDwellMS)) ?? d.crossDwellMS
+        crossLockoutMS = (try? c.decode(Double.self, forKey: .crossLockoutMS)) ?? d.crossLockoutMS
+        anchorDecayRate = (try? c.decode(Double.self, forKey: .anchorDecayRate)) ?? d.anchorDecayRate
         useMockWindows = (try? c.decode(Bool.self, forKey: .useMockWindows)) ?? d.useMockWindows
         axWriteMinIntervalMS = (try? c.decode(Double.self, forKey: .axWriteMinIntervalMS)) ?? d.axWriteMinIntervalMS
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx

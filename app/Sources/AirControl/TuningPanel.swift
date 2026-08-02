@@ -77,6 +77,17 @@ struct TuningView: View {
                        help: "Pause your open palm this long to arm; waves never pause, so never arm")
                 slider("Arm: max drift while holding", $store.config.swipeArmMaxSpeed, 0.1...1.0, "%.2f")
             }
+            Section("Displays") {
+                Toggle("Model A: map hand to whole desktop", isOn: $store.config.useModelA)
+                    .font(.caption)
+                slider("Cross: overshoot", $store.config.crossOvershoot, 0.03...0.2, "%.2f",
+                       help: "Push past the seam by this fraction of the display to cross")
+                slider("Cross: dwell (ms)", $store.config.crossDwellMS, 150...800, "%.0f",
+                       help: "…or hold any pressure against the seam this long")
+                slider("Cross: re-cross lockout (ms)", $store.config.crossLockoutMS, 200...1500, "%.0f")
+                slider("Anchor recenter rate", $store.config.anchorDecayRate, 0...8, "%.1f",
+                       help: "How quickly reach recovers after a cross, scaled by hand speed")
+            }
             Section("Windows") {
                 Toggle("Practice on mock windows", isOn: $store.config.useMockWindows)
                     .font(.caption)
