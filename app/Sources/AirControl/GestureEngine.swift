@@ -14,6 +14,7 @@ struct GestureState {
     var extendedCount = 0
     var swiping = false
     var swipeArmed = false         // palm paused long enough — stroke will count
+    var thumbDir = 0               // fist + sideways thumb held: −1 left, +1 right, 0 none
     var swipeProgress: Double = 0  // signed −1…+1 toward firing
     var swipeEvent: Int?           // fired this frame: −1 left, +1 right
     var settling = false           // riding out the Space-switch animation
@@ -37,6 +38,9 @@ final class GestureEngine {
     private var armedSince: CFTimeInterval?
     private var stillSince: CFTimeInterval?
     private var lastPalm: (t: CFTimeInterval, x: Double, y: Double)?
+    private var poseSince: CFTimeInterval?
+    private var poseDir = 0
+    private var poseFired = false
 
     /// Called (from AppState) when macOS reports the active Space actually
     /// changed — freeze the pointer and suppress gestures while it animates.
@@ -136,12 +140,56 @@ final class GestureEngine {
         s.extendedCount = extended
         s.swiping = extended >= config.swipeMinFingers && !pinching
 
+        // --- Thumb-pose Space switch: fist with the thumb stuck out sideways,
+        // pointing at the Space you want; hold briefly to fire. A static POSE,
+        // not a motion — waves, pointing, and drags share nothing with it, so
+        // it can't be misread, and it can't miss: hold until the meter fills.
+        if config.thumbSwitch, !pinching {
+            var curled = 0
+            for pair in Self.fingerJoints {
+                guard let tip = f.joints[pair.tip], let pip = f.joints[pair.pip] else { continue }
+                if dist(f.wrist, tip) < dist(f.wrist, pip) * 1.0 { curled += 1 }
+            }
+            let thumbBase = f.joints[.thumbIP] ?? f.joints[.thumbMP] ?? f.wrist
+            let dx = Double(f.thumbTip.x - thumbBase.x)
+            let dy = Double(f.thumbTip.y - thumbBase.y)
+            let sideways = abs(dx) > abs(dy) * 1.5
+            let dir = dx > 0 ? 1 : -1
+            if curled >= 3, sideways {
+                if poseSince == nil || dir != poseDir {
+                    poseSince = now
+                    poseDir = dir
+                    poseFired = false
+                }
+                s.thumbDir = dir
+                let progress = min((now - poseSince!) / (config.thumbHoldMS / 1000), 1)
+                s.swipeProgress = Double(dir) * progress
+                if progress >= 1, !poseFired,
+                   now - lastSwipeTime >= config.swipeCooldownMS / 1000 {
+                    lastSwipeTime = now
+                    poseFired = true
+                    s.swipeProgress = 0
+                    // Emit pre-inverted so AppState's swipeNatural transform
+                    // lands on the thumb's literal direction — the thumb
+                    // points AT the target Space, "natural push" doesn't apply.
+                    s.swipeEvent = config.swipeNatural ? -dir : dir
+                }
+            } else {
+                poseSince = nil
+                poseDir = 0
+            }
+        } else {
+            poseSince = nil
+            poseDir = 0
+        }
+
         // --- Swipe: arm-then-stroke. A deliberate swipe starts from a
         // momentary pause (present the palm, then stroke); a wave is
         // continuous motion that never pauses, so it never arms. Once armed,
         // net palm displacement over a time window fires the swipe, still
-        // gated on straightness + horizontality.
-        if s.swiping {
+        // gated on straightness + horizontality. Superseded as the Space
+        // trigger by the thumb pose when that's enabled.
+        if s.swiping, !config.thumbSwitch {
             let palmPoints = Self.palmJoints.compactMap { f.joints[$0] }
             if !palmPoints.isEmpty {
                 let palmX = Double(palmPoints.reduce(0) { $0 + $1.x }) / Double(palmPoints.count)
@@ -199,7 +247,7 @@ final class GestureEngine {
                     }
                 }
             }
-        } else {
+        } else if poseSince == nil { // don't stomp the thumb meter
             s.swipeProgress = 0 // history ages out; a real gap re-arms it
             armedSince = nil
             stillSince = nil

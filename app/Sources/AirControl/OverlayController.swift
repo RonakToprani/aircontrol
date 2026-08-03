@@ -496,7 +496,7 @@ final class OverlayView: NSView {
             let aCG = cgPoint(fromView: a)
             grabOffsetCG = CGPoint(x: t.frame.origin.x - aCG.x, y: t.frame.origin.y - aCG.y)
             lastDragOrigin = t.frame.origin
-            mover.beginDrag(t)
+            mover.beginDrag(t, raise: config.raiseOnGrab)
         }
         if !state.pinching, grabbedTarget != nil {
             mover.endDrag(at: lastDragOrigin) // window commits where dropped
@@ -543,7 +543,7 @@ final class OverlayView: NSView {
     }
 
     private func stepSwipeUI(now: CFTimeInterval, handFresh: Bool) {
-        if let p = pointer, handFresh, state.swiping, abs(state.swipeProgress) > 0.02 {
+        if let p = pointer, handFresh, abs(state.swipeProgress) > 0.02 {
             swipeBarBack.position = CGPoint(x: p.x, y: p.y + ringRadius + 18)
             swipeBarBack.opacity = 1
             let w = CGFloat(abs(state.swipeProgress)) * 64
@@ -559,7 +559,8 @@ final class OverlayView: NSView {
         // --- Status line.
         if state.fps > 0 {
             let gesture = state.pinching ? "PINCH"
-                : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM — hold still to arm")
+                : state.thumbDir != 0 ? (state.thumbDir > 0 ? "THUMB ⟶ hold…" : "⟵ THUMB hold…")
+                : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM open")
                 : "point"
             statusLabel.string = String(format: "AirControl M3 · %.0f fps · %@%@",
                                         state.fps, gesture, handFresh ? "" : " · no hand")

@@ -91,6 +91,8 @@ struct TuningView: View {
             Section("Windows") {
                 Toggle("Practice on mock windows", isOn: $store.config.useMockWindows)
                     .font(.caption)
+                Toggle("Raise window on grab", isOn: $store.config.raiseOnGrab)
+                    .font(.caption)
                 slider("AX write floor (ms)", $store.config.axWriteMinIntervalMS, 16...200, "%.0f",
                        help: "Minimum gap between window-position writes; slow apps auto-throttle above it")
                 slider("Sticky hover margin (px)", $store.config.stickyHoverPx, 0...50, "%.0f",
@@ -100,6 +102,10 @@ struct TuningView: View {
             Section("Spaces") {
                 Toggle("Swipe switches Spaces (⌃←/⌃→)", isOn: $store.config.switchSpaces)
                     .font(.caption)
+                Toggle("Thumb pose instead of swipe (fist + thumb sideways)", isOn: $store.config.thumbSwitch)
+                    .font(.caption)
+                slider("Thumb hold time (ms)", $store.config.thumbHoldMS, 100...800, "%.0f",
+                       help: "Point your thumb at the Space you want; hold this long to fire")
                 Toggle("Natural direction (hand pushes the desktop)", isOn: $store.config.swipeNatural)
                     .font(.caption)
                 HStack {

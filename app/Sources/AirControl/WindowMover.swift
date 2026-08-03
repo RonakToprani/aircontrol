@@ -42,10 +42,16 @@ final class WindowMover {
         }
     }
 
-    func beginDrag(_ target: TargetWindow) {
+    func beginDrag(_ target: TargetWindow, raise: Bool) {
         queue.async {
             self.dragTarget = target
             self.pendingOrigin = nil
+            if raise {
+                AXUIElementPerformAction(target.ax, kAXRaiseAction as CFString)
+                DispatchQueue.main.async {
+                    NSRunningApplication(processIdentifier: target.pid)?.activate()
+                }
+            }
         }
     }
 

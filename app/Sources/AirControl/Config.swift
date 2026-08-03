@@ -30,7 +30,7 @@ struct Config: Codable, Equatable {
     var swipeArmMaxSpeed: Double = 0.35  // palm speed (normalized/s) that still counts as "holding still"
 
     // Multi-display mapping (M2, PLAN §5.3 Model B)
-    var useModelA: Bool = false        // comparison: hand range → whole desktop instead of active display
+    var useModelA: Bool = true         // Ronak's 2-display bake-off pick: hand range → whole desktop
     var crossOvershoot: Double = 0.08  // pointer must push past the seam by this fraction of the display
     var crossDwellMS: Double = 350     // …or hold any pressure against the seam this long
     var crossLockoutMS: Double = 500   // same-seam backward re-cross blocked this long (chaining stays free)
@@ -38,11 +38,14 @@ struct Config: Codable, Equatable {
 
     // Real windows (M3)
     var useMockWindows: Bool = false     // practice on mock windows instead of real ones
+    var raiseOnGrab: Bool = true         // grabbing a window brings it to front, like a mouse click
     var axWriteMinIntervalMS: Double = 33 // floor between AX position writes; latency adapts above it
     var stickyHoverPx: Double = 16       // pointer must exit target frame by this before retargeting
 
     // Spaces (M4 pulled forward)
     var switchSpaces: Bool = true      // fired swipe posts ⌃←/⌃→ (needs Accessibility)
+    var thumbSwitch: Bool = true       // Space switch = fist + thumb pointing sideways (replaces motion swipe)
+    var thumbHoldMS: Double = 300      // hold the thumb pose this long to fire
     var swipeNatural: Bool = true      // hand pushes the desktop: move right → Space on the left
     var postSwipeSettleMS: Double = 1200 // freeze pointer + gestures while the slide animates
 
@@ -80,6 +83,9 @@ struct Config: Codable, Equatable {
         axWriteMinIntervalMS = (try? c.decode(Double.self, forKey: .axWriteMinIntervalMS)) ?? d.axWriteMinIntervalMS
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
+        thumbSwitch = (try? c.decode(Bool.self, forKey: .thumbSwitch)) ?? d.thumbSwitch
+        thumbHoldMS = (try? c.decode(Double.self, forKey: .thumbHoldMS)) ?? d.thumbHoldMS
+        raiseOnGrab = (try? c.decode(Bool.self, forKey: .raiseOnGrab)) ?? d.raiseOnGrab
         swipeNatural = (try? c.decode(Bool.self, forKey: .swipeNatural)) ?? d.swipeNatural
         postSwipeSettleMS = (try? c.decode(Double.self, forKey: .postSwipeSettleMS)) ?? d.postSwipeSettleMS
     }
