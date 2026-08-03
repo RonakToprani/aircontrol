@@ -37,31 +37,49 @@ final class PointerMapper {
     private var lastCrossTime: CFTimeInterval = -1e9
     private var lastCrossDir = (dx: 0, dy: 0)
     private var lastScreenReturned: NSScreen?
-    private var pinchStartP: CGPoint?
-    private var pinchStartA: CGPoint?
+    private var pinchLast: CGPoint?
+    private var precisionOffset = CGVector.zero
+
+    /// Speed band for precision-on-pinch, in hand-ranges/second: at or below
+    /// the low end drag motion is scaled by `precisionOnPinch`; at the high
+    /// end it passes through 1:1 (smoothstepped between), so placing is
+    /// steady but traveling across displays costs no extra hand travel.
+    private let precisionSpeedLo = 0.25
+    private let precisionSpeedHi = 1.0
 
     func map(pointerNorm pIn: CGPoint, anchorNorm aIn: CGPoint, pinching: Bool,
              config: Config, now: CFTimeInterval) -> MappedPointer {
-        var p = pIn
-        var a = aIn
-        // Precision-on-pinch (PLAN §5.2): while dragging, scale hand motion
-        // down around the grab point — a wide mapping's amplified jitter is
-        // traded away exactly when placement precision matters. Release
-        // re-syncs absolutely (the render easing glides the pointer back).
-        if pinching, config.precisionOnPinch < 0.999 {
-            if pinchStartP == nil {
-                pinchStartP = p
-                pinchStartA = a
-            }
-            let f = CGFloat(config.precisionOnPinch)
-            p = CGPoint(x: pinchStartP!.x + (p.x - pinchStartP!.x) * f,
-                        y: pinchStartP!.y + (p.y - pinchStartP!.y) * f)
-            a = CGPoint(x: pinchStartA!.x + (a.x - pinchStartA!.x) * f,
-                        y: pinchStartA!.y + (a.y - pinchStartA!.y) * f)
-        } else {
-            pinchStartP = nil
-            pinchStartA = nil
+        // Hand speed drives both precision gain and offset decay.
+        let dt = now - lastTime
+        var speed = 0.0
+        if let ln = lastNorm, dt < 0.2 {
+            speed = Double(hypot(pIn.x - ln.x, pIn.y - ln.y)) / max(dt, 1e-3)
         }
+        lastNorm = pIn
+        lastTime = now
+
+        // Precision-on-pinch (PLAN §5.2), speed-adaptive: slow drag motion is
+        // scaled down (steady placement); fast motion passes through 1:1. The
+        // scaling accumulates as an offset which, after release, DECAYS away
+        // while the hand moves — the pointer re-syncs invisibly, never jumps.
+        if pinching, config.precisionOnPinch < 0.999 {
+            if let last = pinchLast, dt < 0.2 {
+                let t = min(max((speed - precisionSpeedLo) / (precisionSpeedHi - precisionSpeedLo), 0), 1)
+                let gain = config.precisionOnPinch
+                    + (1 - config.precisionOnPinch) * (t * t * (3 - 2 * t))
+                precisionOffset.dx += (pIn.x - last.x) * CGFloat(gain - 1)
+                precisionOffset.dy += (pIn.y - last.y) * CGFloat(gain - 1)
+            }
+            pinchLast = pIn
+        } else {
+            pinchLast = nil
+            let decay = CGFloat(min(1, config.anchorDecayRate * speed * min(dt, 0.1)))
+            precisionOffset.dx *= 1 - decay
+            precisionOffset.dy *= 1 - decay
+        }
+        let p = CGPoint(x: pIn.x + precisionOffset.dx, y: pIn.y + precisionOffset.dy)
+        let a = CGPoint(x: aIn.x + precisionOffset.dx, y: aIn.y + precisionOffset.dy)
+
         if config.useModelA { return mapModelA(p, a) }
 
         // Display set may have changed under us (hot-plug).
@@ -76,15 +94,9 @@ final class PointerMapper {
         // Recentering decay: while the hand moves, slew the entry-edge anchor
         // back toward the canonical mapping at a rate ∝ hand speed, so the
         // correction hides inside the user's own motion.
-        if let ln = lastNorm {
-            let dt = max(now - lastTime, 1e-3)
-            let speed = Double(hypot(p.x - ln.x, p.y - ln.y)) / dt // hand-ranges/s
-            let decay = CGFloat(min(1, config.anchorDecayRate * speed * dt))
-            anchorOffset.dx *= 1 - decay
-            anchorOffset.dy *= 1 - decay
-        }
-        lastNorm = p
-        lastTime = now
+        let anchorDecay = CGFloat(min(1, config.anchorDecayRate * speed * min(dt, 0.1)))
+        anchorOffset.dx *= 1 - anchorDecay
+        anchorOffset.dy *= 1 - anchorDecay
 
         // Edge pressure from the unclamped overshoot.
         var dir = (dx: 0, dy: 0)
