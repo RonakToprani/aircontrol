@@ -37,9 +37,31 @@ final class PointerMapper {
     private var lastCrossTime: CFTimeInterval = -1e9
     private var lastCrossDir = (dx: 0, dy: 0)
     private var lastScreenReturned: NSScreen?
+    private var pinchStartP: CGPoint?
+    private var pinchStartA: CGPoint?
 
-    func map(pointerNorm p: CGPoint, anchorNorm a: CGPoint,
+    func map(pointerNorm pIn: CGPoint, anchorNorm aIn: CGPoint, pinching: Bool,
              config: Config, now: CFTimeInterval) -> MappedPointer {
+        var p = pIn
+        var a = aIn
+        // Precision-on-pinch (PLAN §5.2): while dragging, scale hand motion
+        // down around the grab point — a wide mapping's amplified jitter is
+        // traded away exactly when placement precision matters. Release
+        // re-syncs absolutely (the render easing glides the pointer back).
+        if pinching, config.precisionOnPinch < 0.999 {
+            if pinchStartP == nil {
+                pinchStartP = p
+                pinchStartA = a
+            }
+            let f = CGFloat(config.precisionOnPinch)
+            p = CGPoint(x: pinchStartP!.x + (p.x - pinchStartP!.x) * f,
+                        y: pinchStartP!.y + (p.y - pinchStartP!.y) * f)
+            a = CGPoint(x: pinchStartA!.x + (a.x - pinchStartA!.x) * f,
+                        y: pinchStartA!.y + (a.y - pinchStartA!.y) * f)
+        } else {
+            pinchStartP = nil
+            pinchStartA = nil
+        }
         if config.useModelA { return mapModelA(p, a) }
 
         // Display set may have changed under us (hot-plug).

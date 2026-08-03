@@ -18,8 +18,29 @@ enum SpaceSwitcher {
     /// direction: −1 = Space to the left (⌃←), +1 = Space to the right (⌃→).
     /// Posts an explicit Control down/up around the arrow — Mission Control
     /// ignores a bare flagged arrow on some systems.
-    static func post(direction: Int) {
+    ///
+    /// `warpTo` (CG coords): with "Displays have separate Spaces", macOS
+    /// targets the display under the REAL cursor — warp it to the AirControl
+    /// pointer first so the switch happens where the hand is, then restore.
+    static func post(direction: Int, warpTo point: CGPoint? = nil) {
         guard isTrusted else { return }
+        if let p = point {
+            let original = CGEvent(source: nil)?.location
+            CGWarpMouseCursorPosition(p)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                postKeys(direction: direction)
+                if let o = original {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        CGWarpMouseCursorPosition(o)
+                    }
+                }
+            }
+            return
+        }
+        postKeys(direction: direction)
+    }
+
+    private static func postKeys(direction: Int) {
         let arrow: CGKeyCode = direction < 0 ? 123 : 124
         let control: CGKeyCode = 59 // kVK_Control
         let source = CGEventSource(stateID: .hidSystemState)

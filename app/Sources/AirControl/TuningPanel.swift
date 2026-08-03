@@ -56,6 +56,8 @@ struct TuningView: View {
                 slider("Edge margin", $store.config.margin, 0.05...0.3, "%.2f")
                 slider("Teleport reject distance", $store.config.jumpRejectDist, 0.1...0.6, "%.2f",
                        help: "1-frame jumps beyond this are treated as misdetections; lower = stricter")
+                slider("Precision while dragging", $store.config.precisionOnPinch, 0.3...1.0, "%.2f",
+                       help: "Hand motion scaled down during a drag for steadier placement; 1 = off")
             }
             Section("Pinch") {
                 slider("Signal smoothing (pinchAlpha)", $store.config.pinchAlpha, 0.1...0.9, "%.2f")

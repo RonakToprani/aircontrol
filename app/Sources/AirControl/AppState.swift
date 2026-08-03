@@ -96,7 +96,7 @@ final class AppState: ObservableObject {
                 if let event = state.swipeEvent, self.configStore.config.switchSpaces {
                     self.accessibilityOK = SpaceSwitcher.isTrusted
                     let dir = self.configStore.config.swipeNatural ? -event : event
-                    SpaceSwitcher.post(direction: dir)
+                    SpaceSwitcher.post(direction: dir, warpTo: self.overlay?.pointerCG())
                 }
 
                 // Menu/panel-facing published state, throttled to ~10 Hz —

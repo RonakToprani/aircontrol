@@ -12,6 +12,7 @@ struct Config: Codable, Equatable {
     var margin: Double = 0.15          // camera-edge dead-zone fraction
     var pointerAtKnuckle: Bool = true  // cursor tracks index MCP instead of fingertip
     var jumpRejectDist: Double = 0.25  // 1-frame wrist jump beyond this is a misdetection
+    var precisionOnPinch: Double = 0.6 // hand motion scaled by this while dragging (1 = off)
 
     // Pinch
     var pinchAlpha: Double = 0.50      // pinch-signal EMA (higher = more responsive)
@@ -39,7 +40,7 @@ struct Config: Codable, Equatable {
     // Real windows (M3)
     var useMockWindows: Bool = false     // practice on mock windows instead of real ones
     var raiseOnGrab: Bool = true         // grabbing a window brings it to front, like a mouse click
-    var axWriteMinIntervalMS: Double = 33 // floor between AX position writes; latency adapts above it
+    var axWriteMinIntervalMS: Double = 16 // floor between AX position writes; latency adapts above it
     var stickyHoverPx: Double = 16       // pointer must exit target frame by this before retargeting
 
     // Spaces (M4 pulled forward)
@@ -62,6 +63,7 @@ struct Config: Codable, Equatable {
         margin = (try? c.decode(Double.self, forKey: .margin)) ?? d.margin
         pointerAtKnuckle = (try? c.decode(Bool.self, forKey: .pointerAtKnuckle)) ?? d.pointerAtKnuckle
         jumpRejectDist = (try? c.decode(Double.self, forKey: .jumpRejectDist)) ?? d.jumpRejectDist
+        precisionOnPinch = (try? c.decode(Double.self, forKey: .precisionOnPinch)) ?? d.precisionOnPinch
         pinchAlpha = (try? c.decode(Double.self, forKey: .pinchAlpha)) ?? d.pinchAlpha
         pinchThresh = (try? c.decode(Double.self, forKey: .pinchThresh)) ?? d.pinchThresh
         pinchHyst = (try? c.decode(Double.self, forKey: .pinchHyst)) ?? d.pinchHyst

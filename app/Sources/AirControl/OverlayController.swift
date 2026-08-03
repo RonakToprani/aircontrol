@@ -80,6 +80,10 @@ final class OverlayController {
     }
 
     func update(state: GestureState) { view.apply(state) }
+
+    /// The AirControl pointer's current global position in CG coords —
+    /// where a Space switch should be targeted.
+    func pointerCG() -> CGPoint? { view.currentPointerCG() }
 }
 
 // MARK: -
@@ -298,6 +302,11 @@ final class OverlayView: NSView {
         super.removeFromSuperview()
     }
 
+    func currentPointerCG() -> CGPoint? {
+        guard let p = pointer else { return nil }
+        return cgPoint(fromView: p)
+    }
+
     func noteSpaceChange() {
         spaceChangeTime = CACurrentMediaTime()
         // The old Space's windows are gone from under the pointer — drop any
@@ -312,7 +321,7 @@ final class OverlayView: NSView {
         state = s
         guard s.handVisible else { return }
         lastSeen = CACurrentMediaTime()
-        let m = mapper.map(pointerNorm: s.pointer, anchorNorm: s.anchor,
+        let m = mapper.map(pointerNorm: s.pointer, anchorNorm: s.anchor, pinching: s.pinching,
                            config: configProvider(), now: lastSeen)
         if m.screenChanged {
             onActiveScreenChange?(m.screen)
