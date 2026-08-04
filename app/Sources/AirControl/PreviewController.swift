@@ -2,6 +2,16 @@ import AppKit
 import AVFoundation
 import Vision
 
+/// Live state of the pinch-corner calibration flow, drawn on the preview so
+/// you can watch yourself define the comfort box.
+struct CalibrationViz {
+    var instruction: String
+    var holdProgress: Double      // 0…1 while a pinch is being held
+    var capturedTopLeft: CGPoint? // normalized camera coords
+    var currentTip: CGPoint?      // normalized camera coords
+    var stage2: Bool              // drawing the rect toward bottom-right
+}
+
 /// A small floating "hand preview" panel: the mirrored camera feed with the
 /// detected hand skeleton drawn on top — so you can see at a glance whether
 /// your hand is in frame and being read correctly. Development/diagnostic aid.
@@ -11,6 +21,9 @@ final class PreviewController: NSObject, NSWindowDelegate {
     private let panel: NSPanel
     private let previewLayer: AVCaptureVideoPreviewLayer
     private let skeleton = CAShapeLayer()
+    private let calLayer = CAShapeLayer()
+    private let holdRing = CAShapeLayer()
+    private let instruction = CATextLayer()
 
     private static let chains: [[VNHumanHandPoseObservation.JointName]] = [
         [.wrist, .thumbCMC, .thumbMP, .thumbIP, .thumbTip],
@@ -57,10 +70,76 @@ final class PreviewController: NSObject, NSWindowDelegate {
         skeleton.lineCap = .round
         skeleton.lineJoin = .round
 
+        calLayer.frame = content.bounds
+        calLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        calLayer.strokeColor = NSColor.systemYellow.cgColor
+        calLayer.fillColor = NSColor.clear.cgColor
+        calLayer.lineWidth = 2
+        calLayer.lineDashPattern = [6, 4]
+
+        holdRing.frame = content.bounds
+        holdRing.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        holdRing.strokeColor = NSColor.systemGreen.cgColor
+        holdRing.fillColor = NSColor.clear.cgColor
+        holdRing.lineWidth = 4
+        holdRing.lineCap = .round
+
+        instruction.fontSize = 12
+        instruction.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        instruction.foregroundColor = NSColor.white.cgColor
+        instruction.backgroundColor = NSColor.black.withAlphaComponent(0.65).cgColor
+        instruction.alignmentMode = .center
+        instruction.contentsScale = 2
+        instruction.frame = CGRect(x: 0, y: size.height - 24, width: size.width, height: 24)
+        instruction.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
+        instruction.isHidden = true
+
         content.layer?.addSublayer(previewLayer)
         content.layer?.addSublayer(skeleton)
+        content.layer?.addSublayer(calLayer)
+        content.layer?.addSublayer(holdRing)
+        content.layer?.addSublayer(instruction)
         panel.contentView = content
         panel.delegate = self
+    }
+
+    /// Draw (or clear, with nil) the calibration walkthrough on the preview.
+    func setCalibration(_ viz: CalibrationViz?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let viz else {
+            instruction.isHidden = true
+            calLayer.path = nil
+            holdRing.path = nil
+            return
+        }
+        instruction.isHidden = false
+        instruction.string = viz.instruction
+        let w = skeleton.bounds.width
+        let h = skeleton.bounds.height
+        let path = CGMutablePath()
+        if let tl = viz.capturedTopLeft {
+            let p = CGPoint(x: tl.x * w, y: tl.y * h)
+            path.move(to: CGPoint(x: p.x - 9, y: p.y))
+            path.addLine(to: CGPoint(x: p.x + 9, y: p.y))
+            path.move(to: CGPoint(x: p.x, y: p.y - 9))
+            path.addLine(to: CGPoint(x: p.x, y: p.y + 9))
+            if viz.stage2, let tip = viz.currentTip {
+                let q = CGPoint(x: tip.x * w, y: tip.y * h)
+                path.addRect(CGRect(x: min(p.x, q.x), y: min(p.y, q.y),
+                                    width: abs(q.x - p.x), height: abs(q.y - p.y)))
+            }
+        }
+        calLayer.path = path
+        if viz.holdProgress > 0, let tip = viz.currentTip {
+            let q = CGPoint(x: tip.x * w, y: tip.y * h)
+            holdRing.path = CGPath(ellipseIn: CGRect(x: q.x - 14, y: q.y - 14, width: 28, height: 28),
+                                   transform: nil)
+            holdRing.strokeEnd = CGFloat(viz.holdProgress)
+        } else {
+            holdRing.path = nil
+        }
     }
 
     func show() { panel.orderFrontRegardless() }

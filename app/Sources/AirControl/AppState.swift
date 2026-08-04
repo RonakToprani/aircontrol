@@ -44,6 +44,7 @@ final class AppState: ObservableObject {
     private var calPinchStart: CFTimeInterval?
     private var calNeedRelease = false
     private var calTopLeft: CGPoint?
+    private var calPrevShowPreview = false
     private var cancellables: Set<AnyCancellable> = []
 
     private init() {
@@ -156,19 +157,56 @@ final class AppState: ObservableObject {
         calTopLeft = nil
         calPinchStart = nil
         calNeedRelease = false
-        overlay?.setPrompt("Calibrate 1/2 — hold a pinch at your comfortable TOP-LEFT")
+        // Pop the hand preview so you can watch yourself draw the box;
+        // restored to its previous state when the flow ends.
+        calPrevShowPreview = showPreview
+        if !showPreview { showPreview = true }
+        overlay?.setPrompt("Calibrating — watch the hand preview panel")
     }
 
     func resetCalibration() {
         configStore.config.calibration = nil
+        endCalibration(message: nil)
+    }
+
+    private func endCalibration(message: String?) {
         calStage = .idle
-        overlay?.setPrompt(nil)
+        preview?.setCalibration(nil)
+        overlay?.setPrompt(message)
+        let closePreview = !calPrevShowPreview
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self, self.calStage == .idle else { return }
+            self.overlay?.setPrompt(nil)
+            if closePreview, self.showPreview { self.showPreview = false }
+        }
     }
 
     /// Two pinch-holds define the comfortable hand rect: top-left, then
     /// bottom-right. Captured from RAW camera-space fingertips, so re-running
-    /// is always independent of the current mapping.
+    /// is always independent of the current mapping. Progress is drawn live
+    /// on the hand preview (hold ring, captured corner, rubber-band rect).
     private func stepCalibration(frame: LandmarkFrame?, state: GestureState, now: CFTimeInterval) {
+        var holdProgress = 0.0
+        defer {
+            if calStage != .idle {
+                let text: String
+                if frame == nil {
+                    text = "Show your hand to the camera"
+                } else if calNeedRelease {
+                    text = "Release the pinch…"
+                } else if calStage == .waitTopLeft {
+                    text = "1/2 · pinch-hold at your comfortable TOP-LEFT"
+                } else {
+                    text = "2/2 · pinch-hold at your comfortable BOTTOM-RIGHT"
+                }
+                preview?.setCalibration(CalibrationViz(
+                    instruction: text,
+                    holdProgress: holdProgress,
+                    capturedTopLeft: calTopLeft,
+                    currentTip: frame?.indexTip,
+                    stage2: calStage == .waitBottomRight))
+            }
+        }
         guard let f = frame else {
             calPinchStart = nil
             return
@@ -180,14 +218,14 @@ final class AppState: ObservableObject {
         }
         guard !calNeedRelease else { return }
         if calPinchStart == nil { calPinchStart = now }
-        guard now - calPinchStart! > 0.6 else { return }
+        holdProgress = min((now - calPinchStart!) / 0.6, 1)
+        guard holdProgress >= 1 else { return }
         calPinchStart = nil
         calNeedRelease = true
 
         if calStage == .waitTopLeft {
             calTopLeft = f.indexTip
             calStage = .waitBottomRight
-            overlay?.setPrompt("Calibrate 2/2 — release, then hold a pinch at BOTTOM-RIGHT")
             return
         }
         let tl = calTopLeft ?? .zero
@@ -196,16 +234,11 @@ final class AppState: ObservableObject {
                            maxX: Double(max(tl.x, br.x)), maxY: Double(max(tl.y, br.y)))
         if rect.maxX - rect.minX < 0.15 || rect.maxY - rect.minY < 0.15 {
             calStage = .waitTopLeft
-            overlay?.setPrompt("Too small — start over: hold a pinch at TOP-LEFT")
+            calTopLeft = nil
             return
         }
         configStore.config.calibration = rect
-        calStage = .idle
-        overlay?.setPrompt("Calibrated ✓ — your comfort box now spans the whole desktop")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
-            guard let self, self.calStage == .idle else { return }
-            self.overlay?.setPrompt(nil)
-        }
+        endCalibration(message: "Calibrated ✓ — your comfort box now spans the whole desktop")
     }
 
     private func stop() {
