@@ -53,7 +53,11 @@ struct TuningView: View {
                        help: "Lower = steadier when still, but lazier")
                 slider("1€ speed response (beta)", $store.config.oneEuroBeta, 0...10, "%.1f",
                        help: "Higher = less lag on fast moves")
-                slider("Edge margin", $store.config.margin, 0.05...0.3, "%.2f")
+                slider("Edge margin", $store.config.margin, 0.05...0.3, "%.2f",
+                       help: store.config.calibration == nil
+                           ? "Active (no calibration yet — run it from the menu bar)"
+                           : "Inactive — calibrated hand rect is in use")
+                readout("Calibration", store.config.calibration != nil ? "custom rect ✓" : "margin default")
                 slider("Teleport reject distance", $store.config.jumpRejectDist, 0.1...0.6, "%.2f",
                        help: "1-frame jumps beyond this are treated as misdetections; lower = stricter")
                 slider("Precision while dragging", $store.config.precisionOnPinch, 0.3...1.0, "%.2f",

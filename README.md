@@ -52,13 +52,43 @@ Carries over Phase 1's validated feel: index-**fingertip** pointer, 60fps render
 
 **What to report back:** which model feels right (or which blend), and tuned values for edge-dwell time and relative gain. That decision drives the Phase 2 mapping implementation.
 
-## Phase 2 — Native macOS App
+## Phase 2 — Native macOS App (current)
 
-**The full implementation plan lives in [PLAN.md](PLAN.md).** In short: a menu-bar-only Swift app (`MenuBarExtra` dropdown with an on/off toggle, calibration, tuning HUD, settings) — `AVFoundation` capture → Vision `VNDetectHumanHandPoseRequest` for landmarks → per-screen click-through overlay windows with 60fps render-easing → Accessibility API (`AXUIElement`) to move real windows → `CGEvent` for Space switching.
+The working app lives in **[`app/`](app/)** — a menu-bar-only Swift app (no Dock icon): `AVFoundation` capture → Vision `VNDetectHumanHandPoseRequest` at ~30fps → 1€-filtered landmarks → the ported Phase 1 gesture engine → click-through overlay with 60fps render-easing → Accessibility API to move real windows → `CGEvent` for Space switching. The full design rationale is in **[PLAN.md](PLAN.md)**.
 
-Multi-monitor mapping is decided by a live bake-off on the real dual-display setup (PLAN.md §5): **continuous absolute across the gap-collapsed desktop** (whole desktop in one comfortable hand range — minimal hand travel, zero seams) vs. **per-display absolute with corrected edge crossing** (pointer-gated push-through with lockout, and anchor-recentering decay instead of a clutch gesture). The fist clutch is dropped from v1 — it collides with pinch detection by construction.
+### Building & running
 
-Out of scope for Phase 2 v1: multi-user profiles, custom gesture training, iOS companion, window resizing (move only), anything requiring network access.
+Requirements: macOS 14+, Xcode (or Command Line Tools) with Swift 5.9+.
+
+```bash
+cd app
+make run
+```
+
+`make run` does everything: `swift build -c release`, assembles `build/AirControl.app` with `Info.plist`, codesigns, and launches. Signing prefers an installed **Apple Development** identity so the camera + Accessibility permission grants survive rebuilds (falls back to ad-hoc, but then macOS revokes grants on every rebuild). Other targets: `make build` (binary only), `make bundle` (app bundle without launching), `make clean`.
+
+First run, grant two permissions:
+
+1. **Camera** — prompted automatically when you enable AirControl.
+2. **Accessibility** (moves windows, posts Space-switch keys) — the prompt only *opens* System Settings; you must flip the AirControl toggle there yourself. The tuning panel shows a live granted/NOT-GRANTED readout plus test buttons.
+
+Space switching posts the default Mission Control shortcuts (⌃← / ⌃→) — they must be enabled in System Settings › Keyboard › Shortcuts.
+
+### Using it
+
+Click the hand icon in the menu bar → **Enable AirControl**.
+
+| Gesture | Action |
+|---|---|
+| Move open hand | Move the overlay pointer (whole desktop, all displays) |
+| Pinch (thumb–index) | Grab the window under the pointer (raises it, like a click); move to drag; release to drop |
+| Fist + thumb pointing left/right, hold ~300ms | Switch Space in that direction, on the display the pointer is on |
+
+**Calibrate hand range…** (menu bar) is strongly recommended: pinch-hold at your comfortable top-left, then bottom-right — that box then maps to the whole desktop, so you never stretch. Re-run any time you change seating position; **Reset calibration** returns to the default camera margin.
+
+**Show tuning panel** exposes every constant as a live slider (smoothing, pinch thresholds, drag precision, Space-switch hold time, AX write rate, …) with live diagnostics (detect FPS, pinch distance, gesture state, AX write latency). Tune by feel; values persist.
+
+Out of scope for Phase 2 v1: multi-user profiles, custom gesture training, iOS companion, window resizing (move only — planned for v2 as a two-handed gesture), anything requiring network access.
 
 ---
 

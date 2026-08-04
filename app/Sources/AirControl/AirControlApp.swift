@@ -12,6 +12,10 @@ struct AirControlApp: App {
                 Text("⚠︎ Space switching needs Accessibility")
             }
             Divider()
+            Button("Calibrate hand range…") { state.startCalibration() }
+                .disabled(!state.enabled)
+            Button("Reset calibration") { state.resetCalibration() }
+            Divider()
             Toggle("Show hand preview", isOn: $state.showPreview)
                 .disabled(!state.enabled)
             Toggle("Show tuning panel", isOn: $state.showTuning)

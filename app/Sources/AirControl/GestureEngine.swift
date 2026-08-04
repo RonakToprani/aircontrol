@@ -81,9 +81,8 @@ final class GestureEngine {
         lastSeen = now
         s.handVisible = true
         s.fps = f.fps
-        s.pointer = remap(config.pointerAtKnuckle ? f.indexMCP : f.indexTip,
-                          margin: config.margin)
-        s.anchor = remap(f.indexMCP, margin: config.margin)
+        s.pointer = remap(config.pointerAtKnuckle ? f.indexMCP : f.indexTip, config: config)
+        s.anchor = remap(f.indexMCP, config: config)
 
         // --- Post-switch settle: while macOS animates the Space slide, the
         // hand is still finishing the swipe — freeze the pointer and suppress
@@ -257,8 +256,17 @@ final class GestureEngine {
         return s
     }
 
-    private func remap(_ p: CGPoint, margin: Double) -> CGPoint {
-        let m = CGFloat(margin)
+    /// Camera space → [0,1] hand range: the calibrated comfortable rect when
+    /// one exists (PLAN §5.4 — small personal box, full desktop reach, no
+    /// stretching), else the symmetric edge-margin default.
+    private func remap(_ p: CGPoint, config: Config) -> CGPoint {
+        if let c = config.calibration {
+            let w = CGFloat(max(c.maxX - c.minX, 0.05))
+            let h = CGFloat(max(c.maxY - c.minY, 0.05))
+            return CGPoint(x: min(max((p.x - CGFloat(c.minX)) / w, 0), 1),
+                           y: min(max((p.y - CGFloat(c.minY)) / h, 0), 1))
+        }
+        let m = CGFloat(config.margin)
         let span = max(1 - 2 * m, 0.01)
         return CGPoint(x: min(max((p.x - m) / span, 0), 1),
                        y: min(max((p.y - m) / span, 0), 1))

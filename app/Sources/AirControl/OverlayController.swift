@@ -84,6 +84,9 @@ final class OverlayController {
     /// The AirControl pointer's current global position in CG coords —
     /// where a Space switch should be targeted.
     func pointerCG() -> CGPoint? { view.currentPointerCG() }
+
+    /// Overrides the status line (calibration instructions etc.); nil clears.
+    func setPrompt(_ text: String?) { view.prompt = text }
 }
 
 // MARK: -
@@ -191,6 +194,7 @@ final class OverlayView: NSView {
     private let swipeFlash = CATextLayer()
     private var swipeFlashTime: CFTimeInterval = -1e9
     private var spaceChangeTime: CFTimeInterval = -1e9
+    var prompt: String? // overrides the status line while set
 
     // M2 seam-crossing UI.
     private var seamPressure: Double = 0
@@ -566,7 +570,9 @@ final class OverlayView: NSView {
         swipeFlash.opacity = Float(max(0, 1 - (now - swipeFlashTime) / 0.8))
 
         // --- Status line.
-        if state.fps > 0 {
+        if let prompt {
+            statusLabel.string = prompt
+        } else if state.fps > 0 {
             let gesture = state.pinching ? "PINCH"
                 : state.thumbDir != 0 ? (state.thumbDir > 0 ? "THUMB ⟶ hold…" : "⟵ THUMB hold…")
                 : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM open")

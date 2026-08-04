@@ -37,6 +37,13 @@ final class AppState: ObservableObject {
     private var tuning: TuningPanelController?
     private var lastUIUpdate: CFTimeInterval = 0
     private var lastAXCheck: CFTimeInterval = 0
+
+    // Pinch-corner calibration flow (PLAN §5.4).
+    private enum CalStage { case idle, waitTopLeft, waitBottomRight }
+    private var calStage: CalStage = .idle
+    private var calPinchStart: CFTimeInterval?
+    private var calNeedRelease = false
+    private var calTopLeft: CGPoint?
     private var cancellables: Set<AnyCancellable> = []
 
     private init() {
@@ -90,10 +97,23 @@ final class AppState: ObservableObject {
                 guard let self, self.enabled else { return }
                 let state = self.engine.process(frame, config: self.configStore.config,
                                                 now: CACurrentMediaTime())
-                self.overlay?.update(state: state)
+                if self.calStage != .idle {
+                    self.stepCalibration(frame: frame, state: state, now: CACurrentMediaTime())
+                    // While calibrating, the pinches are corner markers — no
+                    // grabbing, no swiping, no Space switching.
+                    var neutered = state
+                    neutered.pinching = false
+                    neutered.swipeEvent = nil
+                    neutered.swipeProgress = 0
+                    neutered.thumbDir = 0
+                    self.overlay?.update(state: neutered)
+                } else {
+                    self.overlay?.update(state: state)
+                }
                 self.preview?.update(joints: frame?.joints)
 
-                if let event = state.swipeEvent, self.configStore.config.switchSpaces {
+                if let event = state.swipeEvent, self.calStage == .idle,
+                   self.configStore.config.switchSpaces {
                     self.accessibilityOK = SpaceSwitcher.isTrusted
                     let dir = self.configStore.config.swipeNatural ? -event : event
                     SpaceSwitcher.post(direction: dir, warpTo: self.overlay?.pointerCG())
@@ -130,7 +150,66 @@ final class AppState: ObservableObject {
         }
     }
 
+    func startCalibration() {
+        guard enabled else { return }
+        calStage = .waitTopLeft
+        calTopLeft = nil
+        calPinchStart = nil
+        calNeedRelease = false
+        overlay?.setPrompt("Calibrate 1/2 — hold a pinch at your comfortable TOP-LEFT")
+    }
+
+    func resetCalibration() {
+        configStore.config.calibration = nil
+        calStage = .idle
+        overlay?.setPrompt(nil)
+    }
+
+    /// Two pinch-holds define the comfortable hand rect: top-left, then
+    /// bottom-right. Captured from RAW camera-space fingertips, so re-running
+    /// is always independent of the current mapping.
+    private func stepCalibration(frame: LandmarkFrame?, state: GestureState, now: CFTimeInterval) {
+        guard let f = frame else {
+            calPinchStart = nil
+            return
+        }
+        guard state.pinching else {
+            calPinchStart = nil
+            calNeedRelease = false
+            return
+        }
+        guard !calNeedRelease else { return }
+        if calPinchStart == nil { calPinchStart = now }
+        guard now - calPinchStart! > 0.6 else { return }
+        calPinchStart = nil
+        calNeedRelease = true
+
+        if calStage == .waitTopLeft {
+            calTopLeft = f.indexTip
+            calStage = .waitBottomRight
+            overlay?.setPrompt("Calibrate 2/2 — release, then hold a pinch at BOTTOM-RIGHT")
+            return
+        }
+        let tl = calTopLeft ?? .zero
+        let br = f.indexTip
+        let rect = CalRect(minX: Double(min(tl.x, br.x)), minY: Double(min(tl.y, br.y)),
+                           maxX: Double(max(tl.x, br.x)), maxY: Double(max(tl.y, br.y)))
+        if rect.maxX - rect.minX < 0.15 || rect.maxY - rect.minY < 0.15 {
+            calStage = .waitTopLeft
+            overlay?.setPrompt("Too small — start over: hold a pinch at TOP-LEFT")
+            return
+        }
+        configStore.config.calibration = rect
+        calStage = .idle
+        overlay?.setPrompt("Calibrated ✓ — your comfort box now spans the whole desktop")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self, self.calStage == .idle else { return }
+            self.overlay?.setPrompt(nil)
+        }
+    }
+
     private func stop() {
+        calStage = .idle
         tracker.stop()
         tracker.onFrame = nil
         overlay?.close()

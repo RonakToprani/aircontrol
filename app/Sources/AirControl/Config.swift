@@ -1,6 +1,15 @@
 import Foundation
 import Combine
 
+/// The comfortable hand rectangle in normalized camera coords, captured by
+/// the pinch-corner calibration flow (PLAN §5.4). Maps to the whole desktop.
+struct CalRect: Codable, Equatable {
+    var minX: Double
+    var minY: Double
+    var maxX: Double
+    var maxY: Double
+}
+
 /// Every tunable in one place, seeded with the values Ronak dialed in by feel
 /// on the Phase 1 web prototype. Nothing gesture-related is hardcoded anywhere
 /// else — each field is bound to a live slider in the tuning panel.
@@ -9,7 +18,8 @@ struct Config: Codable, Equatable {
     var posAlpha: Double = 0.35        // render-easing factor, per 60fps frame
     var oneEuroMinCutoff: Double = 1.0 // 1€: smoothing floor (lower = steadier at rest)
     var oneEuroBeta: Double = 2.0      // 1€: speed responsiveness (higher = less lag when fast)
-    var margin: Double = 0.15          // camera-edge dead-zone fraction
+    var margin: Double = 0.15          // camera-edge dead-zone fraction (pre-calibration fallback)
+    var calibration: CalRect?          // calibrated comfortable hand rect; nil = use margin
     var pointerAtKnuckle: Bool = true  // cursor tracks index MCP instead of fingertip
     var jumpRejectDist: Double = 0.25  // 1-frame wrist jump beyond this is a misdetection
     var precisionOnPinch: Double = 0.6 // hand motion scaled by this while dragging (1 = off)
@@ -61,6 +71,7 @@ struct Config: Codable, Equatable {
         oneEuroMinCutoff = (try? c.decode(Double.self, forKey: .oneEuroMinCutoff)) ?? d.oneEuroMinCutoff
         oneEuroBeta = (try? c.decode(Double.self, forKey: .oneEuroBeta)) ?? d.oneEuroBeta
         margin = (try? c.decode(Double.self, forKey: .margin)) ?? d.margin
+        calibration = try? c.decode(CalRect.self, forKey: .calibration)
         pointerAtKnuckle = (try? c.decode(Bool.self, forKey: .pointerAtKnuckle)) ?? d.pointerAtKnuckle
         jumpRejectDist = (try? c.decode(Double.self, forKey: .jumpRejectDist)) ?? d.jumpRejectDist
         precisionOnPinch = (try? c.decode(Double.self, forKey: .precisionOnPinch)) ?? d.precisionOnPinch
