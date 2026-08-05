@@ -15,6 +15,8 @@ struct GestureState {
     var swiping = false
     var swipeArmed = false         // palm paused long enough — stroke will count
     var thumbDir = 0               // fist + sideways thumb held: −1 left, +1 right, 0 none
+    var peaceProgress: Double = 0  // ✌ held toward turning the app off
+    var peaceEvent = false         // fired this frame: disable AirControl
     var swipeProgress: Double = 0  // signed −1…+1 toward firing
     var swipeEvent: Int?           // fired this frame: −1 left, +1 right
     var settling = false           // riding out the Space-switch animation
@@ -41,6 +43,7 @@ final class GestureEngine {
     private var poseSince: CFTimeInterval?
     private var poseDir = 0
     private var poseFired = false
+    private var peaceSince: CFTimeInterval?
 
     /// Called (from AppState) when macOS reports the active Space actually
     /// changed — freeze the pointer and suppress gestures while it animates.
@@ -130,14 +133,36 @@ final class GestureEngine {
         // --- Finger extension: tip farther from wrist than PIP by a factor.
         // Naturally mutually exclusive with a pinch (pinch curls the index).
         var extended = 0
-        for pair in Self.fingerJoints {
+        var extFlags = [false, false, false, false] // index, middle, ring, little
+        var curlFlags = [false, false, false, false]
+        for (i, pair) in Self.fingerJoints.enumerated() {
             guard let tip = f.joints[pair.tip], let pip = f.joints[pair.pip] else { continue }
             let tipD = dist(f.wrist, tip)
             let pipD = max(dist(f.wrist, pip), 1e-6)
-            if tipD > pipD * config.extendThresh { extended += 1 }
+            if tipD > pipD * config.extendThresh {
+                extended += 1
+                extFlags[i] = true
+            }
+            curlFlags[i] = tipD < pipD // clearly folded, not just "not extended"
         }
         s.extendedCount = extended
         s.swiping = extended >= config.swipeMinFingers && !pinching
+
+        // --- ✌ to turn off: index+middle extended, ring+little folded, held
+        // with a visible meter — passing through the shape while opening or
+        // closing the hand never lasts long enough to fire.
+        if config.peaceOff, !pinching,
+           extFlags[0], extFlags[1], curlFlags[2], curlFlags[3] {
+            if peaceSince == nil { peaceSince = now }
+            let progress = min((now - peaceSince!) / (config.peaceHoldMS / 1000), 1)
+            s.peaceProgress = progress
+            if progress >= 1 {
+                peaceSince = nil
+                s.peaceEvent = true
+            }
+        } else {
+            peaceSince = nil
+        }
 
         // --- Thumb-pose Space switch: fist with the thumb stuck out sideways,
         // pointing at the Space you want; hold briefly to fire. A static POSE,

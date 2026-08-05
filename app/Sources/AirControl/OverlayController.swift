@@ -556,11 +556,15 @@ final class OverlayView: NSView {
     }
 
     private func stepSwipeUI(now: CFTimeInterval, handFresh: Bool) {
-        if let p = pointer, handFresh, abs(state.swipeProgress) > 0.02 {
+        // One meter above the cursor: green = swipe/thumb toward a Space
+        // switch, red = ✌ held toward turning the app off.
+        let peace = state.peaceProgress
+        let progress = peace > 0.02 ? peace : abs(state.swipeProgress)
+        if let p = pointer, handFresh, progress > 0.02 {
             swipeBarBack.position = CGPoint(x: p.x, y: p.y + ringRadius + 18)
             swipeBarBack.opacity = 1
-            let w = CGFloat(abs(state.swipeProgress)) * 64
-            swipeBarFill.bounds = CGRect(x: 0, y: 0, width: w, height: 6)
+            swipeBarFill.backgroundColor = (peace > 0.02 ? NSColor.systemRed : NSColor.systemGreen).cgColor
+            swipeBarFill.bounds = CGRect(x: 0, y: 0, width: CGFloat(progress) * 64, height: 6)
             swipeBarFill.position = CGPoint(x: 32, y: 3)
         } else {
             swipeBarBack.opacity = 0
@@ -573,7 +577,8 @@ final class OverlayView: NSView {
         if let prompt {
             statusLabel.string = prompt
         } else if state.fps > 0 {
-            let gesture = state.pinching ? "PINCH"
+            let gesture = state.peaceProgress > 0.02 ? "✌ hold to turn off…"
+                : state.pinching ? "PINCH"
                 : state.thumbDir != 0 ? (state.thumbDir > 0 ? "THUMB ⟶ hold…" : "⟵ THUMB hold…")
                 : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM open")
                 : "point"

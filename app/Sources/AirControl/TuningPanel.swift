@@ -133,6 +133,12 @@ struct TuningView: View {
                     Button("Test ⟶") { SpaceSwitcher.post(direction: 1) }
                 }
             }
+            Section("Power") {
+                Toggle("✌ turns AirControl off", isOn: $store.config.peaceOff)
+                    .font(.caption)
+                slider("Peace hold time (ms)", $store.config.peaceHoldMS, 400...2000, "%.0f",
+                       help: "Index+middle up, ring+little folded; hold until the red meter fills")
+            }
             Section("Live readouts") {
                 readout("Detect FPS", String(format: "%.0f", app.stats.fps))
                 readout("Pinch dist (raw / smooth)",

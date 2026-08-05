@@ -113,6 +113,10 @@ final class AppState: ObservableObject {
                 }
                 self.preview?.update(joints: frame?.joints)
 
+                if state.peaceEvent, self.calStage == .idle {
+                    self.enabled = false // ✌ — camera off, icon goes hollow
+                    return
+                }
                 if let event = state.swipeEvent, self.calStage == .idle,
                    self.configStore.config.switchSpaces {
                     self.accessibilityOK = SpaceSwitcher.isTrusted
