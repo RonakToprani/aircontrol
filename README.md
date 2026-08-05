@@ -1,6 +1,23 @@
 # AirControl
 
-Control macOS windows and virtual desktops with in-air hand gestures captured by the MacBook webcam — no trackpad, no keyboard. Pinch in the air to grab and drag a window; four-finger sweep to switch windows/Spaces. Runs entirely on-device: no cloud, no accounts, no telemetry.
+Control macOS windows and virtual desktops with in-air hand gestures captured by the MacBook webcam — no trackpad, no keyboard. Pinch in the air to grab and drag a window; point your thumb to switch Spaces. Runs entirely on-device: no cloud, no accounts, no telemetry.
+
+## Install (no developer tools needed)
+
+Works on any Mac running macOS 14 (Sonoma) or newer.
+
+1. **[Download AirControl-0.2.0.dmg](https://github.com/RonakToprani/aircontrol/releases/latest)** and open it, then drag **AirControl** into **Applications**.
+2. Open AirControl from Applications. macOS will block it the first time (this test build isn't notarized) — go to **System Settings → Privacy & Security**, scroll down, click **"Open Anyway"**, and confirm.
+3. AirControl lives in the **menu bar** (hand icon, top-right — no Dock icon). Click it → **Enable AirControl**, and allow **Camera** access.
+4. When the **Accessibility** prompt appears: it only *opens* System Settings — you must flip the AirControl switch there yourself (this is how it moves windows).
+5. Click the hand icon → **Calibrate hand range…** and follow the on-screen guide. Done — see the gesture table below.
+
+| Gesture | Action |
+|---|---|
+| Move open hand | Move the cursor |
+| Pinch (thumb + index) on a window | Grab it; move to drag; release to drop |
+| Fist + thumb pointing left/right, hold | Switch desktop/Space in that direction |
+| Peace sign ✌, hold | Turn AirControl off (turn back on from the menu bar) |
 
 ##  Native macOS App - Version 3 (current)
 
