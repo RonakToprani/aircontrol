@@ -1,0 +1,49 @@
+AirControl — control your Mac with in-air hand gestures
+=========================================================
+
+Move windows and switch desktops by waving your hand in front of the
+camera. Everything runs on your Mac — nothing is recorded or uploaded.
+
+Needs macOS 14 (Sonoma) or newer.
+
+
+INSTALL
+-------
+1. Drag AirControl into the Applications folder (shortcut is right here).
+2. Double-click AirControl in Applications. macOS will BLOCK it the
+   first time ("Apple could not verify…") — that's expected for a test
+   build, not a virus warning about this app specifically.
+3. Open System Settings → Privacy & Security, scroll down, and click
+   "Open Anyway" next to the AirControl message. Confirm.
+
+AirControl lives in the MENU BAR (a little hand icon, top-right of the
+screen). It has no Dock icon.
+
+
+FIRST RUN
+---------
+1. Click the hand icon → "Enable AirControl".
+2. Allow CAMERA access when asked.
+3. A prompt will ask for ACCESSIBILITY access (this is how it moves
+   windows). Important: the dialog only OPENS System Settings — you
+   must flip the AirControl switch there yourself, then come back.
+4. Click the hand icon → "Calibrate hand range…" and follow the
+   on-screen guide: pinch-hold at your comfortable top-left, then
+   bottom-right. This makes everything feel right for YOUR arm.
+
+
+GESTURES
+--------
+Point        Open hand, move it — the round cursor follows.
+Move window  Pinch (thumb + index) on a window, move, release to drop.
+Switch desktop  Make a fist, stick your THUMB out sideways pointing
+             where you want to go, hold ~half a second.
+Turn off     Hold a PEACE SIGN ✌ until the red meter fills.
+             (Turn back on from the menu bar icon.)
+
+Tips: sit facing the camera in decent light. If the cursor feels off,
+re-run "Calibrate hand range…". The "Show hand preview" menu item shows
+what the camera sees.
+
+This is an early test build — please tell Ronak everything that felt
+confusing, broken, or magical.

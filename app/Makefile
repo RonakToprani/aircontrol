@@ -8,7 +8,27 @@ ifeq ($(IDENTITY),)
 IDENTITY := -
 endif
 
-.PHONY: run bundle build clean
+VERSION  := $(shell /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Info.plist)
+UNIVERSAL := .build/apple/Products/Release/$(APP)
+
+.PHONY: run bundle build clean dist
+
+# Shareable DMG: universal (arm64 + x86_64) release build + install notes.
+# Signed with whatever identity is installed — WITHOUT a paid Developer ID +
+# notarization, recipients must approve it once in System Settings → Privacy
+# & Security → "Open Anyway" (covered in READ ME FIRST.txt).
+dist:
+	swift build -c release --arch arm64 --arch x86_64
+	rm -rf dist
+	mkdir -p dist/stage/$(APP).app/Contents/MacOS
+	cp Info.plist dist/stage/$(APP).app/Contents/Info.plist
+	cp $(UNIVERSAL) dist/stage/$(APP).app/Contents/MacOS/$(APP)
+	codesign --force --sign "$(IDENTITY)" dist/stage/$(APP).app
+	cp "READ ME FIRST.txt" dist/stage/
+	ln -s /Applications dist/stage/Applications
+	hdiutil create -volname "AirControl $(VERSION)" -srcfolder dist/stage \
+		-ov -format UDZO "dist/AirControl-$(VERSION).dmg"
+	@echo "==> dist/AirControl-$(VERSION).dmg"
 
 run: bundle
 	open $(BUNDLE)
