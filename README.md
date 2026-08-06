@@ -2,7 +2,7 @@
 
 Control macOS windows and virtual desktops with in-air hand gestures captured by the MacBook webcam — no trackpad, no keyboard. Pinch in the air to grab and drag a window; point your thumb to switch Spaces. Runs entirely on-device: no cloud, no accounts, no telemetry.
 
-## Install (no developer tools needed)
+## Install 
 
 Works on any Mac running macOS 14 (Sonoma) or newer.
 
