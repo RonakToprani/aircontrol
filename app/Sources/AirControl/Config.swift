@@ -57,6 +57,8 @@ struct Config: Codable, Equatable {
     var mouseMode: Bool = false        // pointer drives the real cursor; pinch = left click/drag
     var mouseDragSlopPx: Double = 14   // cursor pins at pinch-down until the hand escapes this radius
     var hideSystemCursor: Bool = true  // in mouse mode the ring IS the cursor; hide the system arrow
+    var shakaToggle: Bool = true       // 🤙 held toggles mouse mode
+    var shakaHoldMS: Double = 700      // hold the shaka this long to toggle
 
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
@@ -107,6 +109,8 @@ struct Config: Codable, Equatable {
         mouseMode = (try? c.decode(Bool.self, forKey: .mouseMode)) ?? d.mouseMode
         mouseDragSlopPx = (try? c.decode(Double.self, forKey: .mouseDragSlopPx)) ?? d.mouseDragSlopPx
         hideSystemCursor = (try? c.decode(Bool.self, forKey: .hideSystemCursor)) ?? d.hideSystemCursor
+        shakaToggle = (try? c.decode(Bool.self, forKey: .shakaToggle)) ?? d.shakaToggle
+        shakaHoldMS = (try? c.decode(Double.self, forKey: .shakaHoldMS)) ?? d.shakaHoldMS
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces

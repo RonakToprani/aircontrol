@@ -27,7 +27,10 @@ struct AirControlApp: App {
             Button("Quit AirControl") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
-            Image(systemName: state.enabled ? "hand.raised.fill" : "hand.raised")
+            // The icon tells you the mode at a glance: hand = gestures,
+            // cursor = mouse mode, hollow hand = off.
+            Image(systemName: !state.enabled ? "hand.raised"
+                : config.config.mouseMode ? "cursorarrow.rays" : "hand.raised.fill")
         }
     }
 }

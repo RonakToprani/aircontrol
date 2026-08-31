@@ -77,6 +77,10 @@ struct TuningView: View {
                        help: "Cursor pins at pinch-down until the hand moves this far — jitter stays a clean click")
                 Toggle("Hide the system cursor (the ring is the cursor)", isOn: $store.config.hideSystemCursor)
                     .font(.caption)
+                Toggle("🤙 shaka toggles mouse mode", isOn: $store.config.shakaToggle)
+                    .font(.caption)
+                slider("Shaka hold time (ms)", $store.config.shakaHoldMS, 300...1500, "%.0f",
+                       help: "Thumb + little finger out, middle three folded; hold until the indigo meter fills")
             }
             Section("4-finger swipe") {
                 slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")

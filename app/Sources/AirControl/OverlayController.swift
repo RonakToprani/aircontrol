@@ -348,8 +348,14 @@ final class OverlayView: NSView {
         seamDY = m.pressureDY
         if let event = s.swipeEvent {
             swipeFlashTime = CACurrentMediaTime()
+            swipeFlash.foregroundColor = NSColor.systemGreen.cgColor
             let dir = configProvider().swipeNatural ? -event : event
             swipeFlash.string = dir > 0 ? "Space  ⟶" : "⟵  Space"
+        }
+        if s.shakaEvent { // AppState toggled the mode before handing us this
+            swipeFlashTime = CACurrentMediaTime()
+            swipeFlash.foregroundColor = NSColor.systemIndigo.cgColor
+            swipeFlash.string = configProvider().mouseMode ? "🤙  MOUSE ON" : "🤙  MOUSE OFF"
         }
     }
 
@@ -594,13 +600,16 @@ final class OverlayView: NSView {
 
     private func stepSwipeUI(now: CFTimeInterval, handFresh: Bool) {
         // One meter above the cursor: green = swipe/thumb toward a Space
-        // switch, red = ✌ held toward turning the app off.
+        // switch, red = ✌ held toward turning the app off, indigo = 🤙 held
+        // toward toggling mouse mode.
         let peace = state.peaceProgress
-        let progress = peace > 0.02 ? peace : abs(state.swipeProgress)
+        let shaka = state.shakaProgress
+        let progress = peace > 0.02 ? peace : shaka > 0.02 ? shaka : abs(state.swipeProgress)
         if let p = pointer, handFresh, progress > 0.02 {
             swipeBarBack.position = CGPoint(x: p.x, y: p.y + ringRadius + 18)
             swipeBarBack.opacity = 1
-            swipeBarFill.backgroundColor = (peace > 0.02 ? NSColor.systemRed : NSColor.systemGreen).cgColor
+            swipeBarFill.backgroundColor = (peace > 0.02 ? NSColor.systemRed
+                : shaka > 0.02 ? NSColor.systemIndigo : NSColor.systemGreen).cgColor
             swipeBarFill.bounds = CGRect(x: 0, y: 0, width: CGFloat(progress) * 64, height: 6)
             swipeBarFill.position = CGPoint(x: 32, y: 3)
         } else {
@@ -615,12 +624,14 @@ final class OverlayView: NSView {
             statusLabel.string = prompt
         } else if state.fps > 0 {
             let gesture = state.peaceProgress > 0.02 ? "✌ hold to turn off…"
+                : state.shakaProgress > 0.02 ? "🤙 hold to toggle mouse…"
                 : state.pinching ? "PINCH"
                 : state.thumbDir != 0 ? (state.thumbDir > 0 ? "THUMB ⟶ hold…" : "⟵ THUMB hold…")
                 : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM open")
                 : "point"
-            statusLabel.string = String(format: "AirControl M3 · %.0f fps · %@%@",
-                                        state.fps, gesture, handFresh ? "" : " · no hand")
+            let mode = configProvider().mouseMode ? " · MOUSE" : ""
+            statusLabel.string = String(format: "AirControl M3%@ · %.0f fps · %@%@",
+                                        mode, state.fps, gesture, handFresh ? "" : " · no hand")
         } else {
             statusLabel.string = "AirControl M3 · show your hand to the camera"
         }

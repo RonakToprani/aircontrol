@@ -110,6 +110,11 @@ final class AppState: ObservableObject {
                 guard let self, self.enabled else { return }
                 let state = self.engine.process(frame, config: self.configStore.config,
                                                 now: CACurrentMediaTime())
+                // Toggle BEFORE the overlay sees the event, so its MOUSE
+                // ON/OFF flash reads the mode it just switched into.
+                if state.shakaEvent, self.calStage == .idle {
+                    self.configStore.config.mouseMode.toggle()
+                }
                 if self.calStage != .idle {
                     self.stepCalibration(frame: frame, state: state, now: CACurrentMediaTime())
                     // While calibrating, the pinches are corner markers — no
@@ -119,6 +124,8 @@ final class AppState: ObservableObject {
                     neutered.swipeEvent = nil
                     neutered.swipeProgress = 0
                     neutered.thumbDir = 0
+                    neutered.shakaEvent = false
+                    neutered.shakaProgress = 0
                     self.overlay?.update(state: neutered)
                 } else {
                     self.overlay?.update(state: state)

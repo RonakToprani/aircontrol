@@ -17,6 +17,8 @@ struct GestureState {
     var thumbDir = 0               // fist + sideways thumb held: −1 left, +1 right, 0 none
     var peaceProgress: Double = 0  // ✌ held toward turning the app off
     var peaceEvent = false         // fired this frame: disable AirControl
+    var shakaProgress: Double = 0  // 🤙 held toward toggling mouse mode
+    var shakaEvent = false         // fired this frame: toggle mouse mode
     var swipeProgress: Double = 0  // signed −1…+1 toward firing
     var swipeEvent: Int?           // fired this frame: −1 left, +1 right
     var settling = false           // riding out the Space-switch animation
@@ -44,6 +46,8 @@ final class GestureEngine {
     private var poseDir = 0
     private var poseFired = false
     private var peaceSince: CFTimeInterval?
+    private var shakaSince: CFTimeInterval?
+    private var shakaFired = false
 
     /// Called (from AppState) when macOS reports the active Space actually
     /// changed — freeze the pointer and suppress gestures while it animates.
@@ -164,6 +168,30 @@ final class GestureEngine {
             peaceSince = nil
         }
 
+        // --- 🤙 to toggle mouse mode: thumb + little finger out, the three
+        // middle fingers folded, held with a meter like ✌. Fired ONCE per
+        // pose — it latches until the shape breaks, so a held shaka can't
+        // ping-pong the mode. Mutually exclusive with ✌ (index+middle differ)
+        // and with the thumb Space switch (which now requires the little
+        // finger folded — a true fist).
+        let thumbOut = dist(f.thumbTip, f.indexMCP) / handSize > 0.6
+        if config.shakaToggle, !pinching,
+           thumbOut, extFlags[3], curlFlags[0], curlFlags[1], curlFlags[2] {
+            if shakaSince == nil { shakaSince = now }
+            if !shakaFired {
+                let progress = min((now - shakaSince!) / (config.shakaHoldMS / 1000), 1)
+                s.shakaProgress = progress
+                if progress >= 1 {
+                    shakaFired = true
+                    s.shakaProgress = 0
+                    s.shakaEvent = true
+                }
+            }
+        } else {
+            shakaSince = nil
+            shakaFired = false
+        }
+
         // --- Thumb-pose Space switch: fist with the thumb stuck out sideways,
         // pointing at the Space you want; hold briefly to fire. A static POSE,
         // not a motion — waves, pointing, and drags share nothing with it, so
@@ -179,7 +207,9 @@ final class GestureEngine {
             let dy = Double(f.thumbTip.y - thumbBase.y)
             let sideways = abs(dx) > abs(dy) * 1.5
             let dir = dx > 0 ? 1 : -1
-            if curled >= 3, sideways {
+            // extFlags[3] gate: a shaka also has 3 curled fingers + a
+            // sideways-ish thumb — only a TRUE fist (little folded) switches.
+            if curled >= 3, sideways, !extFlags[3] {
                 if poseSince == nil || dir != poseDir {
                     poseSince = now
                     poseDir = dir
