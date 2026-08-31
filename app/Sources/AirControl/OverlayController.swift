@@ -408,6 +408,7 @@ final class OverlayView: NSView {
         // one thing, and pinch-dragging a title bar moves windows natively.
         if config.mouseMode {
             mouse.dragSlopPx = CGFloat(config.mouseDragSlopPx)
+            mouse.downDelay = config.mouseDownDelayMS / 1000
             mouse.setCursorHidden(config.hideSystemCursor)
             mouse.reassertCursorHide(now: now)
             if handFresh, !state.settling, let p = pointer {
@@ -419,6 +420,7 @@ final class OverlayView: NSView {
                         mouse.pinchDown(at: pCG, now: now, openQuery: config.pinchOpensFiles)
                     }
                     if !state.pinching { mouse.pinchUp(at: pCG) }
+                    mouse.commitPending(now: now)
                     mouse.move(to: pCG)
                 }
             } else {

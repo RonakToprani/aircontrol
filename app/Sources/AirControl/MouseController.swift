@@ -24,6 +24,13 @@ final class MouseController {
     /// at the pinch-down point until the hand clearly escapes this radius —
     /// pinch jitter can never smear a click into a tiny drag or text-select.
     var dragSlopPx: CGFloat = 14
+    /// Deferred mouse-down: a closing fist passes THROUGH the pinch shape
+    /// (thumb and index tips converge), so the down waits this long — a pinch
+    /// that becomes a fist is cancelled before any event posts, a held pinch
+    /// commits after the delay, and a quick tap clicks in full on release.
+    var downDelay: CFTimeInterval = 0.12
+    private var pendingSince: CFTimeInterval?
+    private var pendingPos = CGPoint.zero
     private var dragging = false
     private var downPos = CGPoint.zero
     private var clickCount: Int64 = 1
@@ -36,6 +43,7 @@ final class MouseController {
     private let multiClickRadius: CGFloat = 12
 
     func move(to p: CGPoint) {
+        if pendingSince != nil { return } // pinch forming: cursor holds still
         if buttonDown {
             if !dragging {
                 guard hypot(p.x - downPos.x, p.y - downPos.y) > dragSlopPx else { return }
@@ -54,10 +62,9 @@ final class MouseController {
     }
 
     func pinchDown(at p: CGPoint, now: CFTimeInterval, openQuery: Bool = false) {
-        guard !buttonDown else { return }
-        buttonDown = true
-        dragging = false
-        downPos = p
+        guard !buttonDown, pendingSince == nil else { return }
+        pendingSince = now
+        pendingPos = p
         if now - lastClickTime < NSEvent.doubleClickInterval,
            hypot(p.x - lastClickPos.x, p.y - lastClickPos.y) < multiClickRadius {
             clickCount += 1
@@ -81,24 +88,55 @@ final class MouseController {
                 }
             }
         }
-        post(.leftMouseDown, at: p)
+    }
+
+    /// Commits the deferred mouse-down once the pinch has outlived a
+    /// fist-forming transient. Called every render frame.
+    func commitPending(now: CFTimeInterval) {
+        guard let t = pendingSince, !buttonDown, now - t >= downDelay else { return }
+        pendingSince = nil
+        buttonDown = true
+        dragging = false
+        downPos = pendingPos
+        post(.leftMouseDown, at: downPos)
+    }
+
+    /// The "pinch" turned out to be a fist closing — forget it ever started.
+    func cancelPending() {
+        pendingSince = nil
     }
 
     func pinchUp(at p: CGPoint) {
+        // Quick tap: released before the down committed — post the whole
+        // click now, at the pinch-down point.
+        if pendingSince != nil {
+            pendingSince = nil
+            buttonDown = true
+            post(.leftMouseDown, at: pendingPos)
+            buttonDown = false
+            downPos = pendingPos
+            post(.leftMouseUp, at: pendingPos)
+            finishClick(wasDrag: false)
+            return
+        }
         guard buttonDown else { return }
         buttonDown = false
         // A click (never escaped the slop) releases exactly where it pressed.
         post(.leftMouseUp, at: dragging ? p : downPos)
+        finishClick(wasDrag: dragging)
+        dragging = false
+    }
+
+    private func finishClick(wasDrag: Bool) {
         // Content-aware open: a clean single click on a Finder file item gets
         // a second click appended, so ONE pinch opens it — double-click is a
         // Finder-only convention, buttons and links still get single clicks.
-        if !dragging, openable, clickCount == 1 {
+        if !wasDrag, openable, clickCount == 1 {
             clickCount = 2
             post(.leftMouseDown, at: downPos)
             post(.leftMouseUp, at: downPos)
         }
         openable = false
-        dragging = false
         // Clicks activate the app under the cursor, and activation is the
         // main thing that un-hides the cursor — re-assert on the next frame.
         lastHideAssert = 0
@@ -132,6 +170,7 @@ final class MouseController {
     /// Safety net — the system button must NEVER be left stuck down (mode
     /// toggled off mid-pinch, hand lost, app disabled, overlay closing).
     func releaseIfNeeded(at p: CGPoint? = nil) {
+        pendingSince = nil // an uncommitted down just evaporates
         if buttonDown { pinchUp(at: p ?? lastClickPos) }
     }
 

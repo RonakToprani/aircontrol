@@ -75,6 +75,8 @@ struct TuningView: View {
                     .font(.caption2).foregroundStyle(.tertiary)
                 slider("Click vs drag slop (px)", $store.config.mouseDragSlopPx, 4...40, "%.0f",
                        help: "Cursor pins at pinch-down until the hand moves this far — jitter stays a clean click")
+                slider("Click commit delay (ms)", $store.config.mouseDownDelayMS, 0...300, "%.0f",
+                       help: "Mouse-down waits this long so a closing fist (which passes through the pinch shape) can't misfire a click")
                 Toggle("Hide the system cursor (the ring is the cursor)", isOn: $store.config.hideSystemCursor)
                     .font(.caption)
                 Toggle("🤙 shaka toggles mouse mode", isOn: $store.config.shakaToggle)

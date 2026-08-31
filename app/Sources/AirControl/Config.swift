@@ -56,6 +56,7 @@ struct Config: Codable, Equatable {
     // Mouse mode
     var mouseMode: Bool = false        // pointer drives the real cursor; pinch = left click/drag
     var mouseDragSlopPx: Double = 14   // cursor pins at pinch-down until the hand escapes this radius
+    var mouseDownDelayMS: Double = 120 // mouse-down defers this long so a closing fist can't misfire a click
     var hideSystemCursor: Bool = true  // in mouse mode the ring IS the cursor; hide the system arrow
     var shakaToggle: Bool = true       // 🤙 held toggles mouse mode
     var shakaHoldMS: Double = 1100     // hold the shaka this long to toggle
@@ -112,6 +113,7 @@ struct Config: Codable, Equatable {
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
         mouseMode = (try? c.decode(Bool.self, forKey: .mouseMode)) ?? d.mouseMode
         mouseDragSlopPx = (try? c.decode(Double.self, forKey: .mouseDragSlopPx)) ?? d.mouseDragSlopPx
+        mouseDownDelayMS = (try? c.decode(Double.self, forKey: .mouseDownDelayMS)) ?? d.mouseDownDelayMS
         hideSystemCursor = (try? c.decode(Bool.self, forKey: .hideSystemCursor)) ?? d.hideSystemCursor
         shakaToggle = (try? c.decode(Bool.self, forKey: .shakaToggle)) ?? d.shakaToggle
         shakaHoldMS = (try? c.decode(Double.self, forKey: .shakaHoldMS)) ?? d.shakaHoldMS
