@@ -58,7 +58,7 @@ struct Config: Codable, Equatable {
     var mouseDragSlopPx: Double = 14   // cursor pins at pinch-down until the hand escapes this radius
     var hideSystemCursor: Bool = true  // in mouse mode the ring IS the cursor; hide the system arrow
     var shakaToggle: Bool = true       // 🤙 held toggles mouse mode
-    var shakaHoldMS: Double = 700      // hold the shaka this long to toggle
+    var shakaHoldMS: Double = 1100     // hold the shaka this long to toggle
     var scrollGain: Double = 2.0       // scroll pixels per pointer-pixel of hand travel
     var scrollNatural: Bool = true     // content follows the hand (trackpad-style)
     var scrollMomentum: Bool = true    // scroll coasts briefly after release
