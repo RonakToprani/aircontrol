@@ -1,5 +1,15 @@
 import AppKit
 
+// Private CoreGraphics/SkyLight: lets a BACKGROUND app hide the cursor
+// globally. Without the connection property, CGDisplayHideCursor only works
+// while the calling app is frontmost — and AirControl lives in the menu bar.
+private typealias CGSConnectionID = UInt32
+@_silgen_name("CGSMainConnectionID")
+private func CGSMainConnectionID() -> CGSConnectionID
+@_silgen_name("CGSSetConnectionProperty") @discardableResult
+private func CGSSetConnectionProperty(_ cid: CGSConnectionID, _ target: CGSConnectionID,
+                                      _ key: CFString, _ value: CFTypeRef) -> CGError
+
 /// Mouse mode: drives the REAL macOS cursor from the eased AirControl pointer.
 /// Pinch is the left button — engage = down, hold = drag, release = up — and
 /// successive pinches in place escalate the click count, so double-click
@@ -70,6 +80,26 @@ final class MouseController {
     /// toggled off mid-pinch, hand lost, app disabled, overlay closing).
     func releaseIfNeeded(at p: CGPoint? = nil) {
         if buttonDown { pinchUp(at: p ?? lastClickPos) }
+    }
+
+    // MARK: - System cursor visibility
+
+    private var cursorHidden = false
+
+    /// In mouse mode the AirControl ring IS the cursor — the system arrow
+    /// trailing it is noise. Hide/show are counted by the OS, so this tracks
+    /// its own state and flips exactly once per transition; the process dying
+    /// releases the hide automatically.
+    func setCursorHidden(_ hidden: Bool) {
+        guard hidden != cursorHidden else { return }
+        cursorHidden = hidden
+        if hidden {
+            let cid = CGSMainConnectionID()
+            CGSSetConnectionProperty(cid, cid, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
+            CGDisplayHideCursor(CGMainDisplayID())
+        } else {
+            CGDisplayShowCursor(CGMainDisplayID())
+        }
     }
 
     private func post(_ type: CGEventType, at p: CGPoint) {

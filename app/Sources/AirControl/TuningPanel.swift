@@ -75,6 +75,8 @@ struct TuningView: View {
                     .font(.caption2).foregroundStyle(.tertiary)
                 slider("Click vs drag slop (px)", $store.config.mouseDragSlopPx, 4...40, "%.0f",
                        help: "Cursor pins at pinch-down until the hand moves this far — jitter stays a clean click")
+                Toggle("Hide the system cursor (the ring is the cursor)", isOn: $store.config.hideSystemCursor)
+                    .font(.caption)
             }
             Section("4-finger swipe") {
                 slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")

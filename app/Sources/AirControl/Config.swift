@@ -56,6 +56,7 @@ struct Config: Codable, Equatable {
     // Mouse mode
     var mouseMode: Bool = false        // pointer drives the real cursor; pinch = left click/drag
     var mouseDragSlopPx: Double = 14   // cursor pins at pinch-down until the hand escapes this radius
+    var hideSystemCursor: Bool = true  // in mouse mode the ring IS the cursor; hide the system arrow
 
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
@@ -105,6 +106,7 @@ struct Config: Codable, Equatable {
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
         mouseMode = (try? c.decode(Bool.self, forKey: .mouseMode)) ?? d.mouseMode
         mouseDragSlopPx = (try? c.decode(Double.self, forKey: .mouseDragSlopPx)) ?? d.mouseDragSlopPx
+        hideSystemCursor = (try? c.decode(Bool.self, forKey: .hideSystemCursor)) ?? d.hideSystemCursor
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
