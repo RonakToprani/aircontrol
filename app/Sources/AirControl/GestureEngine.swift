@@ -11,7 +11,7 @@ struct GestureState {
     var pinchRaw: Double = 0
     var pinchSmooth: Double = 0
     var pinching = false
-    var scrollPinching = false     // thumb + MIDDLE tip, index extended — scroll grab
+    var scrollGrab = false         // fist (thumb tucked) — grab the page and scroll
     var extendedCount = 0
     var swiping = false
     var swipeArmed = false         // palm paused long enough — stroke will count
@@ -32,8 +32,9 @@ struct GestureState {
 final class GestureEngine {
     private var pinchSmooth: Double?
     private var pinching = false
-    private var scrollSmooth: Double?
-    private var scrollPinching = false
+    private var scrollGrab = false
+    private var fistSince: CFTimeInterval?
+    private var fistGoneSince: CFTimeInterval?
     private var palmHist: [(t: CFTimeInterval, x: Double, y: Double)] = []
     private var lastPalmT: CFTimeInterval = 0
     private var lastSwipeTime: CFTimeInterval = -1e9
@@ -84,11 +85,11 @@ final class GestureEngine {
             if now - lastSeen > handLostReset {
                 pinching = false
                 pinchSmooth = nil
-                scrollPinching = false
-                scrollSmooth = nil
+                scrollGrab = false
+                fistSince = nil
             }
             s.pinching = pinching
-            s.scrollPinching = scrollPinching
+            s.scrollGrab = scrollGrab
             return s
         }
         lastSeen = now
@@ -106,8 +107,8 @@ final class GestureEngine {
             s.anchor = frozenAnchor ?? s.anchor
             pinching = false
             pinchSmooth = nil
-            scrollPinching = false
-            scrollSmooth = nil
+            scrollGrab = false
+            fistSince = nil
             palmHist.removeAll()
             s.pinching = false
             return s
@@ -135,8 +136,8 @@ final class GestureEngine {
         pinchSmooth = smooth
         if pinching {
             if smooth > config.pinchThresh + config.pinchHyst { pinching = false }
-        } else if smooth < config.pinchThresh, !scrollPinching {
-            pinching = true // a scroll grab curling further can't become a click
+        } else if smooth < config.pinchThresh, !scrollGrab {
+            pinching = true // a scroll fist curling tighter can't become a click
         }
         s.pinchRaw = raw
         s.pinchSmooth = smooth
@@ -160,25 +161,33 @@ final class GestureEngine {
         s.extendedCount = extended
         s.swiping = extended >= config.swipeMinFingers && !pinching
 
-        // --- Scroll pinch: thumb + MIDDLE tip, with the INDEX still extended
-        // (pointing). During a real click-pinch the index curls to the thumb,
-        // so the two pinches can never be confused — mirror-image thresholds,
-        // same EMA + hysteresis, same hand-size normalization.
-        if let middleTip = f.joints[.middleTip] {
-            let rawS = dist(f.thumbTip, middleTip) / handSize
-            let smoothS = scrollSmooth.map { $0 + config.pinchAlpha * (rawS - $0) } ?? rawS
-            scrollSmooth = smoothS
-            if scrollPinching {
-                if smoothS > config.pinchThresh + config.pinchHyst || pinching {
-                    scrollPinching = false
-                }
-            } else if smoothS < config.pinchThresh, !pinching, extFlags[0] {
-                scrollPinching = true
-            }
+        // --- Fist scroll grab: all four fingers clearly folded, thumb TUCKED
+        // — close your hand anywhere and the page follows it. The thumb
+        // disambiguates the fist family: wrapped in = scroll, stuck out
+        // sideways = Space switch, out with the little finger up = 🤙.
+        // A closing fist passes through the pinch shape, so the fist WINS:
+        // a short arm time lets it form, then any engaged pinch is dropped
+        // (the overlay's deferred mouse-down means no click ever posted).
+        // A brief release grace rides out single-frame curl dropouts.
+        let thumbOut = dist(f.thumbTip, f.indexMCP) / handSize > 0.6
+        let fistPose = curlFlags[0] && curlFlags[1] && curlFlags[2] && curlFlags[3] && !thumbOut
+        if fistPose {
+            fistGoneSince = nil
+            if fistSince == nil { fistSince = now }
+            if now - fistSince! >= config.scrollArmMS / 1000 { scrollGrab = true }
         } else {
-            scrollPinching = false
+            fistSince = nil
+            if scrollGrab {
+                if fistGoneSince == nil { fistGoneSince = now }
+                if now - fistGoneSince! > 0.1 { scrollGrab = false }
+            }
         }
-        s.scrollPinching = scrollPinching
+        if scrollGrab {
+            pinching = false
+            pinchSmooth = nil
+            s.pinching = false
+        }
+        s.scrollGrab = scrollGrab
 
         // --- ✌ to turn off: index+middle extended, ring+little folded, held
         // with a visible meter — passing through the shape while opening or
@@ -202,7 +211,6 @@ final class GestureEngine {
         // ping-pong the mode. Mutually exclusive with ✌ (index+middle differ)
         // and with the thumb Space switch (which now requires the little
         // finger folded — a true fist).
-        let thumbOut = dist(f.thumbTip, f.indexMCP) / handSize > 0.6
         if config.shakaToggle, !pinching,
            thumbOut, extFlags[3], curlFlags[0], curlFlags[1], curlFlags[2] {
             if shakaSince == nil { shakaSince = now }
@@ -237,7 +245,9 @@ final class GestureEngine {
             let dir = dx > 0 ? 1 : -1
             // extFlags[3] gate: a shaka also has 3 curled fingers + a
             // sideways-ish thumb — only a TRUE fist (little folded) switches.
-            if curled >= 3, sideways, !extFlags[3] {
+            // thumbOut gate: a scroll fist wraps the thumb IN; only a thumb
+            // clearly stuck out past the hand is aiming at a Space.
+            if curled >= 3, sideways, thumbOut, !extFlags[3] {
                 if poseSince == nil || dir != poseDir {
                     poseSince = now
                     poseDir = dir

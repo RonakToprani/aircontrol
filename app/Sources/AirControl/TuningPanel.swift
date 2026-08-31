@@ -84,7 +84,9 @@ struct TuningView: View {
                 slider("Shaka hold time (ms)", $store.config.shakaHoldMS, 300...1500, "%.0f",
                        help: "Thumb + little finger out, middle three folded; hold until the indigo meter fills")
                 slider("Scroll gain", $store.config.scrollGain, 0.5...6.0, "%.1f",
-                       help: "Thumb + middle-finger pinch (index still pointing) grabs the page; hand motion scrolls")
+                       help: "Make a fist (thumb tucked in) to grab the page; hand motion scrolls it")
+                slider("Fist arm time (ms)", $store.config.scrollArmMS, 0...400, "%.0f",
+                       help: "Fist must hold this long before scrolling starts — rides out a pinch forming")
                 Toggle("Natural scroll (content follows hand)", isOn: $store.config.scrollNatural)
                     .font(.caption)
                 Toggle("Scroll momentum (coasts after release)", isOn: $store.config.scrollMomentum)

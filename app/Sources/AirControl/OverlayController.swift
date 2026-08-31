@@ -389,7 +389,7 @@ final class OverlayView: NSView {
 
         // While scroll-grabbing, the ring holds still — the hand's motion is
         // scrolling content, not pointing. It glides back to the hand after.
-        let scrollHold = config.mouseMode && state.scrollPinching && handFresh
+        let scrollHold = config.mouseMode && state.scrollGrab && handFresh
         if let t = pointerTarget, !scrollHold {
             var p = pointer ?? t
             p.x += (t.x - p.x) * k
@@ -413,8 +413,9 @@ final class OverlayView: NSView {
             mouse.reassertCursorHide(now: now)
             if handFresh, !state.settling, let p = pointer {
                 let pCG = cgPoint(fromView: p)
-                if state.scrollPinching {
-                    mouse.releaseIfNeeded(at: pCG) // a click-pinch morphing in never sticks
+                if state.scrollGrab {
+                    mouse.cancelPending() // the "pinch" was this fist closing
+                    mouse.releaseIfNeeded(at: pCG) // a committed down never sticks
                 } else {
                     if state.pinching, !wasPinching {
                         mouse.pinchDown(at: pCG, now: now, openQuery: config.pinchOpensFiles)
@@ -490,7 +491,7 @@ final class OverlayView: NSView {
             if state.pinching {
                 ring.fillColor = NSColor.systemTeal.withAlphaComponent(0.85).cgColor
                 ring.transform = CATransform3DMakeScale(0.65, 0.65, 1)
-            } else if config.mouseMode, state.scrollPinching {
+            } else if config.mouseMode, state.scrollGrab {
                 ring.fillColor = NSColor.systemIndigo.withAlphaComponent(0.5).cgColor
                 ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
             } else {
@@ -683,7 +684,7 @@ final class OverlayView: NSView {
             let gesture = state.peaceProgress > 0.02 ? "✌ hold to turn off…"
                 : state.shakaProgress > 0.02 ? "🤙 hold to toggle mouse…"
                 : state.pinching ? "PINCH"
-                : state.scrollPinching ? "SCROLL"
+                : state.scrollGrab ? "FIST scroll"
                 : state.thumbDir != 0 ? (state.thumbDir > 0 ? "THUMB ⟶ hold…" : "⟵ THUMB hold…")
                 : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM open")
                 : "point"
