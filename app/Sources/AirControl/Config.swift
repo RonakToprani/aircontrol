@@ -62,6 +62,7 @@ struct Config: Codable, Equatable {
     var scrollGain: Double = 2.0       // scroll pixels per pointer-pixel of hand travel
     var scrollNatural: Bool = true     // content follows the hand (trackpad-style)
     var scrollMomentum: Bool = true    // scroll coasts briefly after release
+    var pinchOpensFiles: Bool = true   // clean pinch on a Finder file item auto-double-clicks
 
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
@@ -117,6 +118,7 @@ struct Config: Codable, Equatable {
         scrollGain = (try? c.decode(Double.self, forKey: .scrollGain)) ?? d.scrollGain
         scrollNatural = (try? c.decode(Bool.self, forKey: .scrollNatural)) ?? d.scrollNatural
         scrollMomentum = (try? c.decode(Bool.self, forKey: .scrollMomentum)) ?? d.scrollMomentum
+        pinchOpensFiles = (try? c.decode(Bool.self, forKey: .pinchOpensFiles)) ?? d.pinchOpensFiles
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces

@@ -87,6 +87,8 @@ struct TuningView: View {
                     .font(.caption)
                 Toggle("Scroll momentum (coasts after release)", isOn: $store.config.scrollMomentum)
                     .font(.caption)
+                Toggle("Pinch opens files (Finder gets a double-click)", isOn: $store.config.pinchOpensFiles)
+                    .font(.caption)
             }
             Section("4-finger swipe") {
                 slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")

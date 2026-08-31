@@ -414,7 +414,9 @@ final class OverlayView: NSView {
                 if state.scrollPinching {
                     mouse.releaseIfNeeded(at: pCG) // a click-pinch morphing in never sticks
                 } else {
-                    if state.pinching, !wasPinching { mouse.pinchDown(at: pCG, now: now) }
+                    if state.pinching, !wasPinching {
+                        mouse.pinchDown(at: pCG, now: now, openQuery: config.pinchOpensFiles)
+                    }
                     if !state.pinching { mouse.pinchUp(at: pCG) }
                     mouse.move(to: pCG)
                 }

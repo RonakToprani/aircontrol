@@ -52,7 +52,7 @@ final class MouseController {
         post(.mouseMoved, at: p)
     }
 
-    func pinchDown(at p: CGPoint, now: CFTimeInterval) {
+    func pinchDown(at p: CGPoint, now: CFTimeInterval, openQuery: Bool = false) {
         guard !buttonDown else { return }
         buttonDown = true
         dragging = false
@@ -65,6 +65,21 @@ final class MouseController {
         }
         lastClickTime = now
         lastClickPos = p
+        // Ask "is this a file icon?" NOW, off the render loop — the answer is
+        // back long before the pinch releases, and a stale generation (a new
+        // pinch started) is discarded.
+        openable = false
+        openQueryGen += 1
+        if openQuery {
+            let gen = openQueryGen
+            axQueue.async { [weak self] in
+                let hit = Self.isFinderFileItem(at: p)
+                DispatchQueue.main.async {
+                    guard let self, gen == self.openQueryGen else { return }
+                    self.openable = hit
+                }
+            }
+        }
         post(.leftMouseDown, at: p)
     }
 
@@ -73,7 +88,41 @@ final class MouseController {
         buttonDown = false
         // A click (never escaped the slop) releases exactly where it pressed.
         post(.leftMouseUp, at: dragging ? p : downPos)
+        // Content-aware open: a clean single click on a Finder file item gets
+        // a second click appended, so ONE pinch opens it — double-click is a
+        // Finder-only convention, buttons and links still get single clicks.
+        if !dragging, openable, clickCount == 1 {
+            clickCount = 2
+            post(.leftMouseDown, at: downPos)
+            post(.leftMouseUp, at: downPos)
+        }
+        openable = false
         dragging = false
+    }
+
+    // MARK: - Content-aware click
+
+    private static let systemWide = AXUIElementCreateSystemWide()
+    /// Roles a Finder file item resolves to under the cursor: icon-view /
+    /// desktop icons (AXImage), list & column view rows and cells, filenames.
+    private static let openableRoles: Set<String> =
+        ["AXImage", "AXCell", "AXRow", "AXTextField", "AXStaticText"]
+    private let axQueue = DispatchQueue(label: "aircontrol.mouse.ax", qos: .userInteractive)
+    private var openable = false
+    private var openQueryGen = 0
+
+    private static func isFinderFileItem(at p: CGPoint) -> Bool {
+        var el: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(systemWide, Float(p.x), Float(p.y), &el) == .success,
+              let el else { return false }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(el, &pid) == .success,
+              NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.apple.finder"
+        else { return false }
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(el, kAXRoleAttribute as CFString, &roleRef) == .success,
+              let role = roleRef as? String else { return false }
+        return openableRoles.contains(role)
     }
 
     /// Safety net — the system button must NEVER be left stuck down (mode
