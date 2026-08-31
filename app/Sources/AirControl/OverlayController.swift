@@ -409,6 +409,7 @@ final class OverlayView: NSView {
         if config.mouseMode {
             mouse.dragSlopPx = CGFloat(config.mouseDragSlopPx)
             mouse.setCursorHidden(config.hideSystemCursor)
+            mouse.reassertCursorHide(now: now)
             if handFresh, !state.settling, let p = pointer {
                 let pCG = cgPoint(fromView: p)
                 if state.scrollPinching {

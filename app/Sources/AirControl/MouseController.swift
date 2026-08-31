@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 
 // Private CoreGraphics/SkyLight: lets a BACKGROUND app hide the cursor
 // globally. Without the connection property, CGDisplayHideCursor only works
@@ -98,6 +99,9 @@ final class MouseController {
         }
         openable = false
         dragging = false
+        // Clicks activate the app under the cursor, and activation is the
+        // main thing that un-hides the cursor — re-assert on the next frame.
+        lastHideAssert = 0
     }
 
     // MARK: - Content-aware click
@@ -154,21 +158,40 @@ final class MouseController {
     // MARK: - System cursor visibility
 
     private var cursorHidden = false
+    private var hideCount = 0
+    private var lastHideAssert: CFTimeInterval = 0
 
     /// In mouse mode the AirControl ring IS the cursor — the system arrow
-    /// trailing it is noise. Hide/show are counted by the OS, so this tracks
-    /// its own state and flips exactly once per transition; the process dying
-    /// releases the hide automatically.
+    /// trailing it is noise. A single hide is NOT enough: macOS re-shows the
+    /// cursor behind our back, most reliably when a synthetic click activates
+    /// the app under it. So the hide is re-asserted on a short cadence while
+    /// hidden (and forced right after every click); each hide bumps the
+    /// WindowServer's per-connection count, so release balances all of them.
     func setCursorHidden(_ hidden: Bool) {
         guard hidden != cursorHidden else { return }
         cursorHidden = hidden
         if hidden {
-            let cid = CGSMainConnectionID()
-            CGSSetConnectionProperty(cid, cid, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
-            CGDisplayHideCursor(CGMainDisplayID())
+            assertHide()
         } else {
-            CGDisplayShowCursor(CGMainDisplayID())
+            while hideCount > 0 {
+                CGDisplayShowCursor(CGMainDisplayID())
+                hideCount -= 1
+            }
         }
+    }
+
+    /// Called every render frame while in mouse mode; cheap unless due.
+    func reassertCursorHide(now: CFTimeInterval) {
+        guard cursorHidden, now - lastHideAssert > 0.3 else { return }
+        assertHide()
+    }
+
+    private func assertHide() {
+        let cid = CGSMainConnectionID()
+        CGSSetConnectionProperty(cid, cid, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
+        CGDisplayHideCursor(CGMainDisplayID())
+        hideCount += 1
+        lastHideAssert = CACurrentMediaTime()
     }
 
     private func post(_ type: CGEventType, at p: CGPoint) {
