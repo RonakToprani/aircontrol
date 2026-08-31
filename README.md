@@ -19,7 +19,13 @@ Works on any Mac running macOS 14 (Sonoma) or newer.
 | Fist + thumb pointing left/right, hold | Switch desktop/Space in that direction |
 | Peace sign ✌, hold | Turn AirControl off (turn back on from the menu bar) |
 
-**Mouse mode** (menu bar → *Mouse mode — pinch to click*): your hand drives the *real* macOS cursor instead — pinch = left click, pinch-hold = drag, two quick pinches = double-click. Window grabbing pauses while it's on (pinch-drag a title bar to move a window, like a mouse would).
+**Mouse mode** (menu bar → *Mouse mode — pinch to click*, or hold a shaka 🤙): your hand drives the *real* macOS cursor instead (the system arrow hides — the teal ring is the cursor) — pinch = left click, pinch-hold = drag, two quick pinches = double-click, and a single pinch on a Finder file or desktop icon opens it. Thumb + middle-finger pinch (keep the index pointing) grabs the page to scroll, with momentum. Window grabbing pauses while it's on (pinch-drag a title bar to move a window, like a mouse would).
+
+| Mouse-mode gesture | Action |
+|---|---|
+| Shaka 🤙 (thumb + little out), hold | Toggle mouse mode on/off — indigo meter fills |
+| Pinch (thumb + index) | Left click; hold and move to drag; on a file icon, opens it |
+| Pinch (thumb + middle, index pointing) | Grab the page and scroll; release to coast |
 
 ##  Native macOS App - Version 3 (current)
 
@@ -53,7 +59,7 @@ Click the hand icon in the menu bar → **Enable AirControl**.
 | Pinch (thumb–index) | Grab the window under the pointer (raises it, like a click); move to drag; release to drop |
 | Fist + thumb pointing left/right, hold ~300ms | Switch Space in that direction, on the display the pointer is on |
 
-**Mouse mode** (menu-bar toggle, persisted): the eased pointer drives the real macOS cursor via `CGEvent` — pinch = left mouse down, hold = drag, release = up; successive pinches in place escalate the click count (double/triple-click). Window grab/hover is suspended while on so a pinch means exactly one thing. Uses the same Accessibility permission as Space switching.
+**Mouse mode** (menu-bar toggle or shaka 🤙 hold, persisted): the eased pointer drives the real macOS cursor via `CGEvent` — pinch = left mouse down, hold = drag (with a click-vs-drag slop so jitter stays a clean click), release = up; successive pinches in place escalate the click count (double/triple-click), and a clean pinch on a Finder file item auto-double-clicks so one pinch opens it. Thumb+middle pinch scrolls (pixel wheel events, momentum coast). The system cursor hides while on — the ring is the cursor. Window grab/hover is suspended so a pinch means exactly one thing. Uses the same Accessibility permission as Space switching.
 
 **Calibrate hand range…** (menu bar) is strongly recommended: pinch-hold at your comfortable top-left, then bottom-right — that box then maps to the whole desktop, so you never stretch. Re-run any time you change seating position; **Reset calibration** returns to the default camera margin.
 
