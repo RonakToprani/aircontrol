@@ -81,6 +81,12 @@ struct TuningView: View {
                     .font(.caption)
                 slider("Shaka hold time (ms)", $store.config.shakaHoldMS, 300...1500, "%.0f",
                        help: "Thumb + little finger out, middle three folded; hold until the indigo meter fills")
+                slider("Scroll gain", $store.config.scrollGain, 0.5...6.0, "%.1f",
+                       help: "Thumb + middle-finger pinch (index still pointing) grabs the page; hand motion scrolls")
+                Toggle("Natural scroll (content follows hand)", isOn: $store.config.scrollNatural)
+                    .font(.caption)
+                Toggle("Scroll momentum (coasts after release)", isOn: $store.config.scrollMomentum)
+                    .font(.caption)
             }
             Section("4-finger swipe") {
                 slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")

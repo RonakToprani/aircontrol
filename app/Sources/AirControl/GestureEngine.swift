@@ -11,6 +11,7 @@ struct GestureState {
     var pinchRaw: Double = 0
     var pinchSmooth: Double = 0
     var pinching = false
+    var scrollPinching = false     // thumb + MIDDLE tip, index extended — scroll grab
     var extendedCount = 0
     var swiping = false
     var swipeArmed = false         // palm paused long enough — stroke will count
@@ -31,6 +32,8 @@ struct GestureState {
 final class GestureEngine {
     private var pinchSmooth: Double?
     private var pinching = false
+    private var scrollSmooth: Double?
+    private var scrollPinching = false
     private var palmHist: [(t: CFTimeInterval, x: Double, y: Double)] = []
     private var lastPalmT: CFTimeInterval = 0
     private var lastSwipeTime: CFTimeInterval = -1e9
@@ -81,8 +84,11 @@ final class GestureEngine {
             if now - lastSeen > handLostReset {
                 pinching = false
                 pinchSmooth = nil
+                scrollPinching = false
+                scrollSmooth = nil
             }
             s.pinching = pinching
+            s.scrollPinching = scrollPinching
             return s
         }
         lastSeen = now
@@ -100,6 +106,8 @@ final class GestureEngine {
             s.anchor = frozenAnchor ?? s.anchor
             pinching = false
             pinchSmooth = nil
+            scrollPinching = false
+            scrollSmooth = nil
             palmHist.removeAll()
             s.pinching = false
             return s
@@ -127,8 +135,8 @@ final class GestureEngine {
         pinchSmooth = smooth
         if pinching {
             if smooth > config.pinchThresh + config.pinchHyst { pinching = false }
-        } else if smooth < config.pinchThresh {
-            pinching = true
+        } else if smooth < config.pinchThresh, !scrollPinching {
+            pinching = true // a scroll grab curling further can't become a click
         }
         s.pinchRaw = raw
         s.pinchSmooth = smooth
@@ -151,6 +159,26 @@ final class GestureEngine {
         }
         s.extendedCount = extended
         s.swiping = extended >= config.swipeMinFingers && !pinching
+
+        // --- Scroll pinch: thumb + MIDDLE tip, with the INDEX still extended
+        // (pointing). During a real click-pinch the index curls to the thumb,
+        // so the two pinches can never be confused — mirror-image thresholds,
+        // same EMA + hysteresis, same hand-size normalization.
+        if let middleTip = f.joints[.middleTip] {
+            let rawS = dist(f.thumbTip, middleTip) / handSize
+            let smoothS = scrollSmooth.map { $0 + config.pinchAlpha * (rawS - $0) } ?? rawS
+            scrollSmooth = smoothS
+            if scrollPinching {
+                if smoothS > config.pinchThresh + config.pinchHyst || pinching {
+                    scrollPinching = false
+                }
+            } else if smoothS < config.pinchThresh, !pinching, extFlags[0] {
+                scrollPinching = true
+            }
+        } else {
+            scrollPinching = false
+        }
+        s.scrollPinching = scrollPinching
 
         // --- ✌ to turn off: index+middle extended, ring+little folded, held
         // with a visible meter — passing through the shape while opening or

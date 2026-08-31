@@ -82,6 +82,26 @@ final class MouseController {
         if buttonDown { pinchUp(at: p ?? lastClickPos) }
     }
 
+    // MARK: - Scrolling
+
+    private var scrollResidual = CGVector.zero
+
+    /// Pixel-unit scroll wheel. Deltas arrive as fractions at render rate;
+    /// the residual accumulator keeps sub-pixel motion instead of rounding it
+    /// away, so slow scrolls stay smooth instead of stuttering.
+    func scroll(dx: CGFloat, dy: CGFloat) {
+        scrollResidual.dx += dx
+        scrollResidual.dy += dy
+        let ix = Int32(scrollResidual.dx.rounded())
+        let iy = Int32(scrollResidual.dy.rounded())
+        guard ix != 0 || iy != 0 else { return }
+        scrollResidual.dx -= CGFloat(ix)
+        scrollResidual.dy -= CGFloat(iy)
+        let e = CGEvent(scrollWheelEvent2Source: source, units: .pixel,
+                        wheelCount: 2, wheel1: iy, wheel2: ix, wheel3: 0)
+        e?.post(tap: .cghidEventTap)
+    }
+
     // MARK: - System cursor visibility
 
     private var cursorHidden = false

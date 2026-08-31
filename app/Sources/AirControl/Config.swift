@@ -59,6 +59,9 @@ struct Config: Codable, Equatable {
     var hideSystemCursor: Bool = true  // in mouse mode the ring IS the cursor; hide the system arrow
     var shakaToggle: Bool = true       // 🤙 held toggles mouse mode
     var shakaHoldMS: Double = 700      // hold the shaka this long to toggle
+    var scrollGain: Double = 2.0       // scroll pixels per pointer-pixel of hand travel
+    var scrollNatural: Bool = true     // content follows the hand (trackpad-style)
+    var scrollMomentum: Bool = true    // scroll coasts briefly after release
 
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
@@ -111,6 +114,9 @@ struct Config: Codable, Equatable {
         hideSystemCursor = (try? c.decode(Bool.self, forKey: .hideSystemCursor)) ?? d.hideSystemCursor
         shakaToggle = (try? c.decode(Bool.self, forKey: .shakaToggle)) ?? d.shakaToggle
         shakaHoldMS = (try? c.decode(Double.self, forKey: .shakaHoldMS)) ?? d.shakaHoldMS
+        scrollGain = (try? c.decode(Double.self, forKey: .scrollGain)) ?? d.scrollGain
+        scrollNatural = (try? c.decode(Bool.self, forKey: .scrollNatural)) ?? d.scrollNatural
+        scrollMomentum = (try? c.decode(Bool.self, forKey: .scrollMomentum)) ?? d.scrollMomentum
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces

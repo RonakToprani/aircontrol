@@ -173,6 +173,12 @@ final class OverlayView: NSView {
     private var pointer: CGPoint?
     private var anchor: CGPoint?
 
+    // Scroll grab (mouse mode): the ring freezes while this eased shadow
+    // point keeps following the hand — its per-frame delta becomes wheel
+    // pixels, and its velocity carries the momentum tail after release.
+    private var scrollEased: CGPoint?
+    private var scrollVel = CGVector.zero
+
     // Drag state (mock windows).
     private var grabbed: MockWindowLayer?
     private var grabOffset: CGPoint = .zero
@@ -381,7 +387,10 @@ final class OverlayView: NSView {
         let dt = max(link.targetTimestamp - link.timestamp, 1.0 / 240.0)
         let k = 1 - pow(1 - CGFloat(config.posAlpha), CGFloat(dt * 60))
 
-        if let t = pointerTarget {
+        // While scroll-grabbing, the ring holds still — the hand's motion is
+        // scrolling content, not pointing. It glides back to the hand after.
+        let scrollHold = config.mouseMode && state.scrollPinching && handFresh
+        if let t = pointerTarget, !scrollHold {
             var p = pointer ?? t
             p.x += (t.x - p.x) * k
             p.y += (t.y - p.y) * k
@@ -402,15 +411,22 @@ final class OverlayView: NSView {
             mouse.setCursorHidden(config.hideSystemCursor)
             if handFresh, !state.settling, let p = pointer {
                 let pCG = cgPoint(fromView: p)
-                if state.pinching, !wasPinching { mouse.pinchDown(at: pCG, now: now) }
-                if !state.pinching { mouse.pinchUp(at: pCG) }
-                mouse.move(to: pCG)
+                if state.scrollPinching {
+                    mouse.releaseIfNeeded(at: pCG) // a click-pinch morphing in never sticks
+                } else {
+                    if state.pinching, !wasPinching { mouse.pinchDown(at: pCG, now: now) }
+                    if !state.pinching { mouse.pinchUp(at: pCG) }
+                    mouse.move(to: pCG)
+                }
             } else {
                 mouse.releaseIfNeeded(at: pointer.map(cgPoint(fromView:)))
             }
+            stepScroll(config: config, dt: dt, k: k, active: scrollHold && !state.settling)
         } else {
             mouse.setCursorHidden(false)
             mouse.releaseIfNeeded()
+            scrollEased = nil
+            scrollVel = .zero
         }
 
         // --- Grab / drag (knuckle-driven, so the pinch curl doesn't lurch it).
@@ -469,6 +485,9 @@ final class OverlayView: NSView {
             if state.pinching {
                 ring.fillColor = NSColor.systemTeal.withAlphaComponent(0.85).cgColor
                 ring.transform = CATransform3DMakeScale(0.65, 0.65, 1)
+            } else if config.mouseMode, state.scrollPinching {
+                ring.fillColor = NSColor.systemIndigo.withAlphaComponent(0.5).cgColor
+                ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
             } else {
                 ring.fillColor = NSColor.systemTeal.withAlphaComponent(hoverActive ? 0.3 : 0.12).cgColor
                 ring.transform = CATransform3DIdentity
@@ -571,6 +590,39 @@ final class OverlayView: NSView {
         }
     }
 
+    /// Scroll grab → wheel pixels. An eased shadow of the pointer target
+    /// supplies smooth per-frame deltas (the visible ring is frozen); on
+    /// release the tracked velocity decays out as a trackpad-style coast.
+    /// Natural direction = content follows the hand.
+    private func stepScroll(config: Config, dt: CFTimeInterval, k: CGFloat, active: Bool) {
+        if active, let t = pointerTarget {
+            var e = scrollEased ?? pointer ?? t
+            let old = e
+            e.x += (t.x - e.x) * k
+            e.y += (t.y - e.y) * k
+            scrollEased = e
+            let sign: CGFloat = config.scrollNatural ? -1 : 1
+            let g = CGFloat(config.scrollGain) * sign
+            let dx = (e.x - old.x) * g
+            let dy = (e.y - old.y) * g
+            mouse.scroll(dx: dx, dy: dy)
+            let f = CGFloat(1.0 / (dt * 60)) // velocity per 60fps frame
+            scrollVel.dx = scrollVel.dx * 0.7 + dx * f * 0.3
+            scrollVel.dy = scrollVel.dy * 0.7 + dy * f * 0.3
+        } else {
+            scrollEased = nil
+            guard config.scrollMomentum, abs(scrollVel.dx) + abs(scrollVel.dy) > 0.4 else {
+                scrollVel = .zero
+                return
+            }
+            let frames = CGFloat(dt * 60)
+            mouse.scroll(dx: scrollVel.dx * frames, dy: scrollVel.dy * frames)
+            let decay = pow(0.93, frames)
+            scrollVel.dx *= decay
+            scrollVel.dy *= decay
+        }
+    }
+
     private func drawGhost(_ r: CGRect, strong: Bool) {
         ghost.frame = r
         ghost.path = CGPath(roundedRect: CGRect(origin: .zero, size: r.size),
@@ -626,6 +678,7 @@ final class OverlayView: NSView {
             let gesture = state.peaceProgress > 0.02 ? "✌ hold to turn off…"
                 : state.shakaProgress > 0.02 ? "🤙 hold to toggle mouse…"
                 : state.pinching ? "PINCH"
+                : state.scrollPinching ? "SCROLL"
                 : state.thumbDir != 0 ? (state.thumbDir > 0 ? "THUMB ⟶ hold…" : "⟵ THUMB hold…")
                 : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM open")
                 : "point"
