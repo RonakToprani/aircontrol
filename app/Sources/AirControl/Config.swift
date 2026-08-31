@@ -55,6 +55,7 @@ struct Config: Codable, Equatable {
 
     // Mouse mode
     var mouseMode: Bool = false        // pointer drives the real cursor; pinch = left click/drag
+    var mouseDragSlopPx: Double = 14   // cursor pins at pinch-down until the hand escapes this radius
 
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
@@ -103,6 +104,7 @@ struct Config: Codable, Equatable {
         axWriteMinIntervalMS = (try? c.decode(Double.self, forKey: .axWriteMinIntervalMS)) ?? d.axWriteMinIntervalMS
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
         mouseMode = (try? c.decode(Bool.self, forKey: .mouseMode)) ?? d.mouseMode
+        mouseDragSlopPx = (try? c.decode(Double.self, forKey: .mouseDragSlopPx)) ?? d.mouseDragSlopPx
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces

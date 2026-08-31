@@ -391,6 +391,7 @@ final class OverlayView: NSView {
         // the left button. Grab/hover is suspended — pinch must mean exactly
         // one thing, and pinch-dragging a title bar moves windows natively.
         if config.mouseMode {
+            mouse.dragSlopPx = CGFloat(config.mouseDragSlopPx)
             if handFresh, !state.settling, let p = pointer {
                 let pCG = cgPoint(fromView: p)
                 if state.pinching, !wasPinching { mouse.pinchDown(at: pCG, now: now) }
