@@ -73,6 +73,7 @@ final class OverlayController {
             NSWorkspace.shared.notificationCenter.removeObserver(o)
             spaceObserver = nil
         }
+        view.prepareForClose() // release a held synthetic mouse button
         hudWindow?.orderOut(nil)
         hudWindow = nil
         contentWindow?.orderOut(nil)
@@ -159,6 +160,7 @@ final class OverlayView: NSView {
     private let mockHost: CALayer // the Space-bound content window's layer
     private let mover: WindowMover
     private let mapper = PointerMapper()
+    private let mouse = MouseController()
     var onActiveScreenChange: ((NSScreen) -> Void)?
 
     // Latest state from the gesture engine (detection rate).
@@ -301,9 +303,14 @@ final class OverlayView: NSView {
     }
 
     override func removeFromSuperview() {
+        prepareForClose()
+        super.removeFromSuperview()
+    }
+
+    func prepareForClose() {
+        mouse.releaseIfNeeded()
         link?.invalidate()
         link = nil
-        super.removeFromSuperview()
     }
 
     func currentPointerCG() -> CGPoint? {
@@ -380,12 +387,38 @@ final class OverlayView: NSView {
             anchor = a
         }
 
+        // --- Mouse mode: the eased pointer drives the REAL cursor; pinch is
+        // the left button. Grab/hover is suspended — pinch must mean exactly
+        // one thing, and pinch-dragging a title bar moves windows natively.
+        if config.mouseMode {
+            if handFresh, !state.settling, let p = pointer {
+                let pCG = cgPoint(fromView: p)
+                if state.pinching, !wasPinching { mouse.pinchDown(at: pCG, now: now) }
+                if !state.pinching { mouse.pinchUp(at: pCG) }
+                mouse.move(to: pCG)
+            } else {
+                mouse.releaseIfNeeded(at: pointer.map(cgPoint(fromView:)))
+            }
+        } else {
+            mouse.releaseIfNeeded()
+        }
+
         // --- Grab / drag (knuckle-driven, so the pinch curl doesn't lurch it).
-        let mocksOn = config.useMockWindows
+        let mocksOn = config.useMockWindows && !config.mouseMode
         mockHost.isHidden = !mocksOn
         let hoverActive: Bool
 
-        if mocksOn {
+        if config.mouseMode {
+            grabbed = nil
+            if grabbedTarget != nil { // mode flipped mid-AX-drag: drop in place
+                mover.endDrag(at: lastDragOrigin)
+                grabbedTarget = nil
+            }
+            hoveredTarget = nil
+            latestHover = nil
+            ghost.opacity = 0
+            hoverActive = false
+        } else if mocksOn {
             ghost.opacity = 0
             if state.pinching, !wasPinching, handFresh, let p = pointer, let a = anchor {
                 if let win = mockWindows.last(where: { $0.containsInSuperlayer(p) }) {

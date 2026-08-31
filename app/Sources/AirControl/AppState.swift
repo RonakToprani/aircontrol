@@ -24,7 +24,8 @@ final class AppState: ObservableObject {
     @Published private(set) var axLatencyMS: Double = 0
 
     var needsAccessibility: Bool {
-        enabled && configStore.config.switchSpaces && !accessibilityOK
+        enabled && !accessibilityOK
+            && (configStore.config.switchSpaces || configStore.config.mouseMode)
     }
 
     let configStore = ConfigStore()
@@ -62,6 +63,17 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
         mover.onLatency = { [weak self] ms in self?.axLatencyMS = ms }
 
+        // Mouse mode posts CGEvents — same Accessibility trust as Space
+        // switching. Prompt the moment it's flipped on, not at next launch.
+        configStore.$config
+            .map(\.mouseMode)
+            .removeDuplicates()
+            .sink { [weak self] on in
+                guard let self, on, self.enabled else { return }
+                self.accessibilityOK = SpaceSwitcher.requestTrust()
+            }
+            .store(in: &cancellables)
+
         // The engine's pointer-freeze is keyed to macOS actually switching
         // Spaces — never to the swipe gesture, which may switch nothing.
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -84,7 +96,7 @@ final class AppState: ObservableObject {
 
     private func start() {
         cameraError = nil
-        if configStore.config.switchSpaces {
+        if configStore.config.switchSpaces || configStore.config.mouseMode {
             accessibilityOK = SpaceSwitcher.requestTrust()
         }
         let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],

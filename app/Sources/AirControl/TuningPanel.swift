@@ -68,6 +68,12 @@ struct TuningView: View {
                 slider("Threshold", $store.config.pinchThresh, 0.2...0.8, "%.2f")
                 slider("Release hysteresis", $store.config.pinchHyst, 0.02...0.3, "%.2f")
             }
+            Section("Mouse mode") {
+                Toggle("Pointer drives the real cursor", isOn: $store.config.mouseMode)
+                    .font(.caption)
+                Text("Pinch = left click · pinch-hold = drag · two quick pinches = double-click. Window grabbing pauses while on (pinch-drag a title bar instead). Needs Accessibility.")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
             Section("4-finger swipe") {
                 slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")
                 slider("Time window (ms)", $store.config.swipeMaxTimeMS, 250...1000, "%.0f")

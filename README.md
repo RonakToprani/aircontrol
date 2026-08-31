@@ -19,6 +19,8 @@ Works on any Mac running macOS 14 (Sonoma) or newer.
 | Fist + thumb pointing left/right, hold | Switch desktop/Space in that direction |
 | Peace sign ✌, hold | Turn AirControl off (turn back on from the menu bar) |
 
+**Mouse mode** (menu bar → *Mouse mode — pinch to click*): your hand drives the *real* macOS cursor instead — pinch = left click, pinch-hold = drag, two quick pinches = double-click. Window grabbing pauses while it's on (pinch-drag a title bar to move a window, like a mouse would).
+
 ##  Native macOS App - Version 3 (current)
 
 The working app lives in **[`app/`](app/)** — a menu-bar-only Swift app (no Dock icon): `AVFoundation` capture → Vision `VNDetectHumanHandPoseRequest` at ~30fps → 1€-filtered landmarks → the ported Phase 1 gesture engine → click-through overlay with 60fps render-easing → Accessibility API to move real windows → `CGEvent` for Space switching. The full design rationale is in **[PLAN.md](PLAN.md)**.
@@ -50,6 +52,8 @@ Click the hand icon in the menu bar → **Enable AirControl**.
 | Move open hand | Move the overlay pointer (whole desktop, all displays) |
 | Pinch (thumb–index) | Grab the window under the pointer (raises it, like a click); move to drag; release to drop |
 | Fist + thumb pointing left/right, hold ~300ms | Switch Space in that direction, on the display the pointer is on |
+
+**Mouse mode** (menu-bar toggle, persisted): the eased pointer drives the real macOS cursor via `CGEvent` — pinch = left mouse down, hold = drag, release = up; successive pinches in place escalate the click count (double/triple-click). Window grab/hover is suspended while on so a pinch means exactly one thing. Uses the same Accessibility permission as Space switching.
 
 **Calibrate hand range…** (menu bar) is strongly recommended: pinch-hold at your comfortable top-left, then bottom-right — that box then maps to the whole desktop, so you never stretch. Re-run any time you change seating position; **Reset calibration** returns to the default camera margin.
 

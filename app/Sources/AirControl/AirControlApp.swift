@@ -3,14 +3,17 @@ import SwiftUI
 @main
 struct AirControlApp: App {
     @StateObject private var state = AppState.shared
+    @StateObject private var config = AppState.shared.configStore
 
     var body: some Scene {
         MenuBarExtra {
             Toggle("Enable AirControl", isOn: $state.enabled)
             Text(state.statusLine)
             if state.needsAccessibility {
-                Text("⚠︎ Space switching needs Accessibility")
+                Text("⚠︎ Needs Accessibility permission")
             }
+            Divider()
+            Toggle("Mouse mode — pinch to click", isOn: $config.config.mouseMode)
             Divider()
             Button("Calibrate hand range…") { state.startCalibration() }
                 .disabled(!state.enabled)

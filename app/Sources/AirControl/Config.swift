@@ -53,6 +53,9 @@ struct Config: Codable, Equatable {
     var axWriteMinIntervalMS: Double = 16 // floor between AX position writes; latency adapts above it
     var stickyHoverPx: Double = 16       // pointer must exit target frame by this before retargeting
 
+    // Mouse mode
+    var mouseMode: Bool = false        // pointer drives the real cursor; pinch = left click/drag
+
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
     var peaceHoldMS: Double = 1000     // hold the peace sign this long to turn off
@@ -99,6 +102,7 @@ struct Config: Codable, Equatable {
         useMockWindows = (try? c.decode(Bool.self, forKey: .useMockWindows)) ?? d.useMockWindows
         axWriteMinIntervalMS = (try? c.decode(Double.self, forKey: .axWriteMinIntervalMS)) ?? d.axWriteMinIntervalMS
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
+        mouseMode = (try? c.decode(Bool.self, forKey: .mouseMode)) ?? d.mouseMode
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
