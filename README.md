@@ -26,6 +26,8 @@ Works on any Mac running macOS 14 (Sonoma) or newer.
 | Shaka 🤙 (thumb + little out), hold | Toggle mouse mode on/off — indigo meter fills |
 | Pinch (thumb + index) | Left click; hold and move to drag; on a file icon, opens it |
 | Fist (thumb tucked in) | Grab the page and scroll; open to release and coast |
+| Pinch-hold still on a text box | Dictate — mic listens while you hold (orange ring), release types it |
+| Pinch + tilt hand down, release | Press Enter/send (green ring shows "release to send"; tilt back up to cancel) |
 
 ##  Native macOS App - Version 3 (current)
 
@@ -59,7 +61,7 @@ Click the hand icon in the menu bar → **Enable AirControl**.
 | Pinch (thumb–index) | Grab the window under the pointer (raises it, like a click); move to drag; release to drop |
 | Fist + thumb pointing left/right, hold ~300ms | Switch Space in that direction, on the display the pointer is on |
 
-**Mouse mode** (menu-bar toggle or shaka 🤙 hold, persisted): the eased pointer drives the real macOS cursor via `CGEvent` — pinch = left mouse down, hold = drag (with a click-vs-drag slop so jitter stays a clean click), release = up; successive pinches in place escalate the click count (double/triple-click), and a clean pinch on a Finder file item auto-double-clicks so one pinch opens it. A fist with the thumb tucked grabs the page to scroll (pixel wheel events, momentum coast) — thumb tucked = scroll, thumb out sideways = Space switch, thumb out + little up = shaka. The system cursor hides while on — the ring is the cursor. Window grab/hover is suspended so a pinch means exactly one thing. Uses the same Accessibility permission as Space switching.
+**Mouse mode** (menu-bar toggle or shaka 🤙 hold, persisted): the eased pointer drives the real macOS cursor via `CGEvent` — pinch = left mouse down, hold = drag (with a click-vs-drag slop so jitter stays a clean click), release = up; successive pinches in place escalate the click count (double/triple-click), and a clean pinch on a Finder file item auto-double-clicks so one pinch opens it. A fist with the thumb tucked grabs the page to scroll (pixel wheel events, momentum coast) — thumb tucked = scroll, thumb out sideways = Space switch, thumb out + little up = shaka. Pinch-holding still on a text field is push-to-talk dictation: the mic is live only while the pinch is held, recognition is Apple's on-device engine (audio never leaves the Mac), the live transcript shows in the HUD, and release types the result. Pinch + tilt the hand down + release presses Return — but only when a text field has focus; it works mid-dictation or later, after you've read the text over. The system cursor hides while on — the ring is the cursor. Window grab/hover is suspended so a pinch means exactly one thing. Uses the same Accessibility permission as Space switching.
 
 **Calibrate hand range…** (menu bar) is strongly recommended: pinch-hold at your comfortable top-left, then bottom-right — that box then maps to the whole desktop, so you never stretch. Re-run any time you change seating position; **Reset calibration** returns to the default camera margin.
 
