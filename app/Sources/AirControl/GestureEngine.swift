@@ -14,7 +14,8 @@ struct GestureState {
     var scrollGrab = false         // fist (thumb tucked) — grab the page and scroll
     var scrollPoint: CGPoint = .zero // UNCLAMPED remap of the fist — scrolling works past the box edge
     var pointerHeld = false        // scroll or its clutch grace: the pointer must not move
-    var handTiltDown = false       // knuckles rotated clearly below the wrist (tilt-to-send)
+    var sendProgress: Double = 0   // 👍 held toward pressing Return
+    var sendEvent = false          // fired this frame: press Return (text-with-content gate applies later)
     var extendedCount = 0
     var swiping = false
     var swipeArmed = false         // palm paused long enough — stroke will count
@@ -56,6 +57,8 @@ final class GestureEngine {
     private var peaceSince: CFTimeInterval?
     private var shakaSince: CFTimeInterval?
     private var shakaFired = false
+    private var sendSince: CFTimeInterval?
+    private var sendFired = false
 
     /// Called (from AppState) when macOS reports the active Space actually
     /// changed — freeze the pointer and suppress gestures while it animates.
@@ -152,13 +155,6 @@ final class GestureEngine {
         s.pinchSmooth = smooth
         s.pinching = pinching
 
-        // --- Hand tilt (wrist → middle knuckle pointing down): the only
-        // gesture axis that reads wrist ORIENTATION, so it conflicts with
-        // nothing — used by tilt-to-send while a pinch is held.
-        let tiltDX = Double(middleMCP.x - f.wrist.x)
-        let tiltDY = Double(middleMCP.y - f.wrist.y)
-        s.handTiltDown = tiltDY < 0 && abs(tiltDY) > abs(tiltDX) * config.tiltSendRatio
-
         // --- Finger extension: tip farther from wrist than PIP by a factor.
         // Naturally mutually exclusive with a pinch (pinch curls the index).
         var extended = 0
@@ -211,6 +207,39 @@ final class GestureEngine {
             s.pinching = false
         }
         s.scrollGrab = scrollGrab
+
+        // --- 👍 to send: a fist with the thumb pointing straight UP, held
+        // until the meter fills — presses Return (the text-field-with-content
+        // gate is checked at fire time, outside the engine). In-plane thumb
+        // direction like the Space switch, so it reads reliably — unlike the
+        // out-of-plane wrist tilt it replaced. Disjoint from every fist
+        // sibling: scroll tucks the thumb, Space points it sideways (slope
+        // gap between the two cones), 🤙 frees the little finger. Latches
+        // until the pose breaks.
+        if config.mouseMode, config.thumbsUpSend, !pinching, !scrollGrab,
+           thumbOut, curlFlags[0], curlFlags[1], curlFlags[2], curlFlags[3] {
+            let thumbBase = f.joints[.thumbIP] ?? f.joints[.thumbMP] ?? f.wrist
+            let dx = Double(f.thumbTip.x - thumbBase.x)
+            let dy = Double(f.thumbTip.y - thumbBase.y)
+            if dy > 0, dy > abs(dx) * 1.5 {
+                if sendSince == nil { sendSince = now }
+                if !sendFired {
+                    let progress = min((now - sendSince!) / (config.thumbsUpHoldMS / 1000), 1)
+                    s.sendProgress = progress
+                    if progress >= 1 {
+                        sendFired = true
+                        s.sendProgress = 0
+                        s.sendEvent = true
+                    }
+                }
+            } else {
+                sendSince = nil
+                sendFired = false
+            }
+        } else {
+            sendSince = nil
+            sendFired = false
+        }
         s.scrollPoint = remap(f.indexMCP, config: config, clamped: false)
         s.pointerHeld = config.mouseMode && (scrollGrab || now < clutchUntil)
 

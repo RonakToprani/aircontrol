@@ -187,7 +187,6 @@ final class OverlayView: NSView {
     private var dictating = false
     private var pinchStart: CFTimeInterval = -1e9
     private var dictationDisplay: String? // HUD transcript line while live
-    private var sendArmed = false // pinch held + hand tilted down: release = ⏎
 
     // Drag state (mock windows).
     private var grabbed: MockWindowLayer?
@@ -375,6 +374,14 @@ final class OverlayView: NSView {
             swipeFlash.foregroundColor = NSColor.systemIndigo.cgColor
             swipeFlash.string = configProvider().mouseMode ? "🤙  MOUSE ON" : "🤙  MOUSE OFF"
         }
+        // 👍 fired (once per engine frame — handled here, not in step, so a
+        // render frame can never see it twice and double-press Return).
+        if s.sendEvent {
+            mouse.pressReturnIfTextHasContent()
+            swipeFlashTime = CACurrentMediaTime()
+            swipeFlash.foregroundColor = NSColor.systemGreen.cgColor
+            swipeFlash.string = "👍  ⏎"
+        }
     }
 
     @objc private func step(_ link: CADisplayLink) {
@@ -426,7 +433,6 @@ final class OverlayView: NSView {
             if handFresh, !state.settling, let p = pointer {
                 let pCG = cgPoint(fromView: p)
                 if state.scrollGrab {
-                    sendArmed = false
                     mouse.cancelPending() // the "pinch" was this fist closing
                     mouse.releaseIfNeeded(at: pCG) // a committed down never sticks
                 } else {
@@ -436,27 +442,11 @@ final class OverlayView: NSView {
                                         openQuery: config.pinchOpensFiles,
                                         textQuery: config.dictation)
                     }
-                    // Tilt-to-send: while a PLANTED pinch is held, tilting
-                    // the hand down arms Return-on-release — the HUD says so
-                    // before anything commits; tilt back up to cancel. A
-                    // drag can never send.
-                    if config.tiltSend, state.pinching, !mouse.dragging {
-                        if state.handTiltDown, !sendArmed {
-                            sendArmed = true
-                            mouse.cancelPending() // a pure send needn't click
-                        } else if !state.handTiltDown, sendArmed {
-                            sendArmed = false
-                        }
-                    }
-                    if mouse.dragging { sendArmed = false }
                     if !state.pinching {
-                        let sendNow = sendArmed && config.tiltSend
-                        sendArmed = false
                         if dictating {
-                            endDictation(sendAfter: sendNow)
+                            endDictation()
                         } else {
                             mouse.pinchUp(at: pCG)
-                            if sendNow { mouse.pressReturnIfTextFocused() }
                         }
                     }
                     // Pinch held still on a text field past the threshold:
@@ -481,7 +471,6 @@ final class OverlayView: NSView {
             mouse.releaseIfNeeded()
             scrollEased = nil
             scrollVel = .zero
-            sendArmed = false
             if dictating { abortDictation() }
         }
 
@@ -538,11 +527,7 @@ final class OverlayView: NSView {
         if let p = pointer {
             ring.position = p
             ring.opacity = handFresh ? (state.settling ? 0.35 : 1) : 0.25
-            if sendArmed {
-                // Release will press ⏎ — show the commitment before it's made.
-                ring.fillColor = NSColor.systemGreen.withAlphaComponent(0.85).cgColor
-                ring.transform = CATransform3DMakeScale(0.7, 0.7, 1)
-            } else if dictating {
+            if dictating {
                 // Push-to-talk live: unmistakably NOT a click.
                 ring.fillColor = NSColor.systemOrange.withAlphaComponent(0.8).cgColor
                 ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
@@ -708,15 +693,13 @@ final class OverlayView: NSView {
         }
     }
 
-    /// Pinch released: stop the mic, type the final transcript into the
-    /// field — and if the release was tilted, follow it with Return.
-    private func endDictation(sendAfter: Bool = false) {
+    /// Pinch released: stop the mic, type the final transcript into the field.
+    private func endDictation() {
         dictating = false
         dictationDisplay = "🎤 …"
         speech.stop { [weak self] text in
             guard let self else { return }
             if !text.isEmpty { self.mouse.typeText(text) }
-            if sendAfter { self.mouse.pressReturnIfTextFocused() }
             self.dictationDisplay = nil
         }
     }
@@ -767,12 +750,15 @@ final class OverlayView: NSView {
         // toward toggling mouse mode.
         let peace = state.peaceProgress
         let shaka = state.shakaProgress
-        let progress = peace > 0.02 ? peace : shaka > 0.02 ? shaka : abs(state.swipeProgress)
+        let send = state.sendProgress
+        let progress = peace > 0.02 ? peace : shaka > 0.02 ? shaka
+            : send > 0.02 ? send : abs(state.swipeProgress)
         if let p = pointer, handFresh, progress > 0.02 {
             swipeBarBack.position = CGPoint(x: p.x, y: p.y + ringRadius + 18)
             swipeBarBack.opacity = 1
             swipeBarFill.backgroundColor = (peace > 0.02 ? NSColor.systemRed
-                : shaka > 0.02 ? NSColor.systemIndigo : NSColor.systemGreen).cgColor
+                : shaka > 0.02 ? NSColor.systemIndigo
+                : send > 0.02 ? NSColor.systemMint : NSColor.systemGreen).cgColor
             swipeBarFill.bounds = CGRect(x: 0, y: 0, width: CGFloat(progress) * 64, height: 6)
             swipeBarFill.position = CGPoint(x: 32, y: 3)
         } else {
@@ -785,13 +771,12 @@ final class OverlayView: NSView {
         // --- Status line.
         if let prompt {
             statusLabel.string = prompt
-        } else if sendArmed {
-            statusLabel.string = "⏎ release to send — tilt back up to cancel"
         } else if let dictation = dictationDisplay {
             statusLabel.string = dictation
         } else if state.fps > 0 {
             let gesture = state.peaceProgress > 0.02 ? "✌ hold to turn off…"
                 : state.shakaProgress > 0.02 ? "🤙 hold to toggle mouse…"
+                : state.sendProgress > 0.02 ? "👍 hold to send ⏎…"
                 : state.pinching ? "PINCH"
                 : state.scrollGrab ? "FIST scroll"
                 : state.thumbDir != 0 ? (state.thumbDir > 0 ? "THUMB ⟶ hold…" : "⟵ THUMB hold…")

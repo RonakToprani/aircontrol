@@ -126,6 +126,8 @@ final class AppState: ObservableObject {
                     neutered.thumbDir = 0
                     neutered.shakaEvent = false
                     neutered.shakaProgress = 0
+                    neutered.sendEvent = false
+                    neutered.sendProgress = 0
                     self.overlay?.update(state: neutered)
                 } else {
                     self.overlay?.update(state: state)

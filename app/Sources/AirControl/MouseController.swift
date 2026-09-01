@@ -199,12 +199,18 @@ final class MouseController {
         lastHideAssert = 0
     }
 
-    /// Tilt-to-send: press Return, but ONLY when something text-editable has
-    /// keyboard focus — a stray tilted pinch on the desktop must do nothing.
-    /// The focus check runs off the render loop; the key posts on its answer.
-    func pressReturnIfTextFocused() {
+    /// 👍-to-send: press Return, but ONLY when something text-editable has
+    /// keyboard focus AND isn't verifiably empty — a thumbs-up over the
+    /// desktop or an empty box must do nothing. The AX check runs off the
+    /// render loop; the key posts on its answer.
+    func pressReturnIfTextHasContent() {
         axQueue.async { [weak self] in
-            guard let self, Self.focusedElementIsText() else { return }
+            guard let self, let el = Self.focusedTextElement() else { return }
+            var valueRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(el, kAXValueAttribute as CFString, &valueRef) == .success,
+               let value = valueRef as? String, value.isEmpty {
+                return // provably empty — nothing to send (unreadable ≠ empty)
+            }
             DispatchQueue.main.async {
                 let down = CGEvent(keyboardEventSource: self.source, virtualKey: 36, keyDown: true)
                 down?.post(tap: .cghidEventTap)
@@ -214,17 +220,17 @@ final class MouseController {
         }
     }
 
-    private static func focusedElementIsText() -> Bool {
+    private static func focusedTextElement() -> AXUIElement? {
         var focusedRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString,
                                             &focusedRef) == .success,
               let focusedRef, CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
-        else { return false }
+        else { return nil }
         let el = focusedRef as! AXUIElement
         var roleRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(el, kAXRoleAttribute as CFString, &roleRef) == .success,
-              let role = roleRef as? String else { return false }
-        return isTextRole(role, element: el)
+              let role = roleRef as? String, isTextRole(role, element: el) else { return nil }
+        return el
     }
 
     /// Types a string into whatever has keyboard focus, as synthetic unicode

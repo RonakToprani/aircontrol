@@ -68,8 +68,8 @@ struct Config: Codable, Equatable {
     var pinchOpensFiles: Bool = true   // clean pinch on a Finder file item auto-double-clicks
     var dictation: Bool = true         // pinch-hold still on a text field = push-to-talk dictation
     var dictateHoldMS: Double = 450    // pinch must hold still this long on a text field to start listening
-    var tiltSend: Bool = true          // pinch + tilt hand down + release = press Return (text focus only)
-    var tiltSendRatio: Double = 1.5    // how vertical the wrist→knuckle vector must be to count as tilted
+    var thumbsUpSend: Bool = true      // 👍 held presses Return when a text field with content has focus
+    var thumbsUpHoldMS: Double = 350   // hold the 👍 this long to fire
 
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
@@ -131,8 +131,8 @@ struct Config: Codable, Equatable {
         pinchOpensFiles = (try? c.decode(Bool.self, forKey: .pinchOpensFiles)) ?? d.pinchOpensFiles
         dictation = (try? c.decode(Bool.self, forKey: .dictation)) ?? d.dictation
         dictateHoldMS = (try? c.decode(Double.self, forKey: .dictateHoldMS)) ?? d.dictateHoldMS
-        tiltSend = (try? c.decode(Bool.self, forKey: .tiltSend)) ?? d.tiltSend
-        tiltSendRatio = (try? c.decode(Double.self, forKey: .tiltSendRatio)) ?? d.tiltSendRatio
+        thumbsUpSend = (try? c.decode(Bool.self, forKey: .thumbsUpSend)) ?? d.thumbsUpSend
+        thumbsUpHoldMS = (try? c.decode(Double.self, forKey: .thumbsUpHoldMS)) ?? d.thumbsUpHoldMS
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
