@@ -95,6 +95,10 @@ struct TuningView: View {
                     .font(.caption)
                 Toggle("Pinch opens files (Finder gets a double-click)", isOn: $store.config.pinchOpensFiles)
                     .font(.caption)
+                Toggle("Dictation: pinch-hold a text field to speak", isOn: $store.config.dictation)
+                    .font(.caption)
+                slider("Dictation hold (ms)", $store.config.dictateHoldMS, 200...1000, "%.0f",
+                       help: "Pinch a text box and hold still this long — mic goes live while you hold, release types what you said. On-device recognition.")
             }
             Section("4-finger swipe") {
                 slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")

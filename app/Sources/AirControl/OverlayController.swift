@@ -181,6 +181,13 @@ final class OverlayView: NSView {
     private var scrollEased: CGPoint?
     private var scrollVel = CGVector.zero
 
+    // Dictation (mouse mode): pinch-hold still on a text field turns the
+    // pinch into a push-to-talk button.
+    private let speech = SpeechController()
+    private var dictating = false
+    private var pinchStart: CFTimeInterval = -1e9
+    private var dictationDisplay: String? // HUD transcript line while live
+
     // Drag state (mock windows).
     private var grabbed: MockWindowLayer?
     private var grabOffset: CGPoint = .zero
@@ -316,6 +323,7 @@ final class OverlayView: NSView {
     }
 
     func prepareForClose() {
+        if dictating { abortDictation() }
         mouse.releaseIfNeeded()
         mouse.setCursorHidden(false)
         link?.invalidate()
@@ -342,7 +350,7 @@ final class OverlayView: NSView {
         guard s.handVisible else { return }
         lastSeen = CACurrentMediaTime()
         let m = mapper.map(pointerNorm: s.pointer, anchorNorm: s.anchor, pinching: s.pinching,
-                           hold: s.pointerHeld, config: configProvider(), now: lastSeen)
+                           hold: s.pointerHeld || dictating, config: configProvider(), now: lastSeen)
         scrollNormTarget = s.scrollPoint
         if m.screenChanged {
             onActiveScreenChange?(m.screen)
@@ -421,11 +429,30 @@ final class OverlayView: NSView {
                     mouse.releaseIfNeeded(at: pCG) // a committed down never sticks
                 } else {
                     if state.pinching, !wasPinching {
-                        mouse.pinchDown(at: pCG, now: now, openQuery: config.pinchOpensFiles)
+                        pinchStart = now
+                        mouse.pinchDown(at: pCG, now: now,
+                                        openQuery: config.pinchOpensFiles,
+                                        textQuery: config.dictation)
                     }
-                    if !state.pinching { mouse.pinchUp(at: pCG) }
-                    mouse.commitPending(now: now)
-                    mouse.move(to: pCG)
+                    if !state.pinching {
+                        if dictating {
+                            endDictation()
+                        } else {
+                            mouse.pinchUp(at: pCG)
+                        }
+                    }
+                    // Pinch held still on a text field past the threshold:
+                    // the click completes (field focused, caret placed) and
+                    // the pinch becomes the push-to-talk button.
+                    if config.dictation, state.pinching, !dictating,
+                       !mouse.dragging, mouse.textTarget,
+                       now - pinchStart >= config.dictateHoldMS / 1000 {
+                        beginDictation()
+                    }
+                    if !dictating {
+                        mouse.commitPending(now: now)
+                        mouse.move(to: pCG)
+                    }
                 }
             } else {
                 mouse.releaseIfNeeded(at: pointer.map(cgPoint(fromView:)))
@@ -436,6 +463,7 @@ final class OverlayView: NSView {
             mouse.releaseIfNeeded()
             scrollEased = nil
             scrollVel = .zero
+            if dictating { abortDictation() }
         }
 
         // --- Grab / drag (knuckle-driven, so the pinch curl doesn't lurch it).
@@ -491,7 +519,11 @@ final class OverlayView: NSView {
         if let p = pointer {
             ring.position = p
             ring.opacity = handFresh ? (state.settling ? 0.35 : 1) : 0.25
-            if state.pinching {
+            if dictating {
+                // Push-to-talk live: unmistakably NOT a click.
+                ring.fillColor = NSColor.systemOrange.withAlphaComponent(0.8).cgColor
+                ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
+            } else if state.pinching {
                 ring.fillColor = NSColor.systemTeal.withAlphaComponent(0.85).cgColor
                 ring.transform = CATransform3DMakeScale(0.65, 0.65, 1)
             } else if config.mouseMode, state.scrollGrab {
@@ -633,6 +665,50 @@ final class OverlayView: NSView {
         }
     }
 
+    // MARK: - Dictation
+
+    private func beginDictation() {
+        mouse.completeClickEarly() // click lands: field focused, caret placed
+        dictating = true
+        dictationDisplay = "🎤 listening…"
+        speech.onPartial = { [weak self] text in
+            guard let self, self.dictating, !text.isEmpty else { return }
+            self.dictationDisplay = "🎤 " + text
+        }
+        speech.start { [weak self] ok in
+            guard let self, !ok else { return }
+            let reason = self.speech.unavailableReason
+            self.dictationDisplay = reason.isEmpty
+                ? "🎤 allow Microphone + Speech, then try again" : "🎤 \(reason)"
+            self.dictating = false
+            self.clearDictationDisplaySoon()
+        }
+    }
+
+    /// Pinch released: stop the mic, type the final transcript into the field.
+    private func endDictation() {
+        dictating = false
+        dictationDisplay = "🎤 …"
+        speech.stop { [weak self] text in
+            guard let self else { return }
+            if !text.isEmpty { self.mouse.typeText(text) }
+            self.dictationDisplay = nil
+        }
+    }
+
+    private func abortDictation() {
+        dictating = false
+        dictationDisplay = nil
+        speech.cancel()
+    }
+
+    private func clearDictationDisplaySoon() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self, !self.dictating else { return }
+            self.dictationDisplay = nil
+        }
+    }
+
     private func drawGhost(_ r: CGRect, strong: Bool) {
         ghost.frame = r
         ghost.path = CGPath(roundedRect: CGRect(origin: .zero, size: r.size),
@@ -684,6 +760,8 @@ final class OverlayView: NSView {
         // --- Status line.
         if let prompt {
             statusLabel.string = prompt
+        } else if let dictation = dictationDisplay {
+            statusLabel.string = dictation
         } else if state.fps > 0 {
             let gesture = state.peaceProgress > 0.02 ? "✌ hold to turn off…"
                 : state.shakaProgress > 0.02 ? "🤙 hold to toggle mouse…"

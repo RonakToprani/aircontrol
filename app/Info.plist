@@ -24,6 +24,10 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>AirControl uses the camera to track your hand so you can point at and move windows with in-air gestures. All processing happens on-device; nothing is recorded or sent anywhere.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>In mouse mode, pinch-holding on a text field turns the pinch into a push-to-talk button: AirControl listens only while you hold the pinch and types what you said. Audio is processed on-device and never recorded or sent anywhere.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>AirControl transcribes your dictation on-device (Apple speech recognition with on-device mode) to type into the text field you pinched. Nothing leaves your Mac.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

@@ -31,7 +31,7 @@ final class MouseController {
     var downDelay: CFTimeInterval = 0.12
     private var pendingSince: CFTimeInterval?
     private var pendingPos = CGPoint.zero
-    private var dragging = false
+    private(set) var dragging = false
     private var downPos = CGPoint.zero
     private var clickCount: Int64 = 1
     private var lastClickTime: CFTimeInterval = -1e9
@@ -61,7 +61,8 @@ final class MouseController {
         post(.mouseMoved, at: p)
     }
 
-    func pinchDown(at p: CGPoint, now: CFTimeInterval, openQuery: Bool = false) {
+    func pinchDown(at p: CGPoint, now: CFTimeInterval,
+                   openQuery: Bool = false, textQuery: Bool = false) {
         guard !buttonDown, pendingSince == nil else { return }
         pendingSince = now
         pendingPos = p
@@ -73,18 +74,20 @@ final class MouseController {
         }
         lastClickTime = now
         lastClickPos = p
-        // Ask "is this a file icon?" NOW, off the render loop — the answer is
-        // back long before the pinch releases, and a stale generation (a new
-        // pinch started) is discarded.
+        // Ask "what's under the pinch?" NOW, off the render loop — the answer
+        // is back long before the pinch releases, and a stale generation (a
+        // new pinch started) is discarded.
         openable = false
+        textTarget = false
         openQueryGen += 1
-        if openQuery {
+        if openQuery || textQuery {
             let gen = openQueryGen
             axQueue.async { [weak self] in
-                let hit = Self.isFinderFileItem(at: p)
+                let hit = Self.classify(at: p)
                 DispatchQueue.main.async {
                     guard let self, gen == self.openQueryGen else { return }
-                    self.openable = hit
+                    self.openable = openQuery && hit.openable
+                    self.textTarget = textQuery && hit.text
                 }
             }
         }
@@ -142,29 +145,80 @@ final class MouseController {
         lastHideAssert = 0
     }
 
-    // MARK: - Content-aware click
+    // MARK: - Content-aware click / target classification
 
     private static let systemWide = AXUIElementCreateSystemWide()
     /// Roles a Finder file item resolves to under the cursor: icon-view /
     /// desktop icons (AXImage), list & column view rows and cells, filenames.
     private static let openableRoles: Set<String> =
         ["AXImage", "AXCell", "AXRow", "AXTextField", "AXStaticText"]
+    /// Roles that mean "you can type here" (dictation targets).
+    private static let textRoles: Set<String> =
+        ["AXTextField", "AXTextArea", "AXSearchField", "AXComboBox"]
     private let axQueue = DispatchQueue(label: "aircontrol.mouse.ax", qos: .userInteractive)
     private var openable = false
+    private(set) var textTarget = false
     private var openQueryGen = 0
 
-    private static func isFinderFileItem(at p: CGPoint) -> Bool {
+    private static func classify(at p: CGPoint) -> (openable: Bool, text: Bool) {
         var el: AXUIElement?
         guard AXUIElementCopyElementAtPosition(systemWide, Float(p.x), Float(p.y), &el) == .success,
-              let el else { return false }
-        var pid: pid_t = 0
-        guard AXUIElementGetPid(el, &pid) == .success,
-              NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.apple.finder"
-        else { return false }
+              let el else { return (false, false) }
         var roleRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(el, kAXRoleAttribute as CFString, &roleRef) == .success,
-              let role = roleRef as? String else { return false }
-        return openableRoles.contains(role)
+              let role = roleRef as? String else { return (false, false) }
+        let text = isTextRole(role, element: el)
+        var pid: pid_t = 0
+        let inFinder = AXUIElementGetPid(el, &pid) == .success
+            && NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.apple.finder"
+        return (inFinder && openableRoles.contains(role), text)
+    }
+
+    /// Known text roles, plus a fallback for web/Electron editors whose roles
+    /// vary: any focused-style element exposing a selected-text range is a
+    /// place a caret can live.
+    private static func isTextRole(_ role: String, element: AXUIElement) -> Bool {
+        if textRoles.contains(role) { return true }
+        guard role != "AXStaticText" else { return false }
+        var v: CFTypeRef?
+        return AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString,
+                                             &v) == .success
+    }
+
+    // MARK: - Dictation support
+
+    /// Dictation begins while the pinch is still held: complete the click NOW
+    /// (up at the down point) so the field gets focus and the caret lands —
+    /// the continuing pinch belongs to the microphone, not the button.
+    func completeClickEarly() {
+        commitPending(now: CACurrentMediaTime()) // a still-pending down counts
+        guard buttonDown, !dragging else { return }
+        buttonDown = false
+        post(.leftMouseUp, at: downPos)
+        openable = false
+        lastHideAssert = 0
+    }
+
+    /// Types a string into whatever has keyboard focus, as synthetic unicode
+    /// key events — works identically in native apps, browsers, and Electron.
+    /// Chunked on character boundaries (the event API caps the payload).
+    func typeText(_ text: String) {
+        guard !text.isEmpty else { return }
+        var chunk: [UniChar] = []
+        func flush() {
+            guard !chunk.isEmpty else { return }
+            let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
+            down?.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: chunk)
+            down?.post(tap: .cghidEventTap)
+            let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+            up?.post(tap: .cghidEventTap)
+            chunk.removeAll()
+        }
+        for ch in text {
+            chunk.append(contentsOf: Array(String(ch).utf16))
+            if chunk.count >= 18 { flush() }
+        }
+        flush()
     }
 
     /// Safety net — the system button must NEVER be left stuck down (mode

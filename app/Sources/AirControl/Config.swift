@@ -66,6 +66,8 @@ struct Config: Codable, Equatable {
     var scrollNatural: Bool = true     // content follows the hand (trackpad-style)
     var scrollMomentum: Bool = true    // scroll coasts briefly after release
     var pinchOpensFiles: Bool = true   // clean pinch on a Finder file item auto-double-clicks
+    var dictation: Bool = true         // pinch-hold still on a text field = push-to-talk dictation
+    var dictateHoldMS: Double = 450    // pinch must hold still this long on a text field to start listening
 
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
@@ -125,6 +127,8 @@ struct Config: Codable, Equatable {
         scrollNatural = (try? c.decode(Bool.self, forKey: .scrollNatural)) ?? d.scrollNatural
         scrollMomentum = (try? c.decode(Bool.self, forKey: .scrollMomentum)) ?? d.scrollMomentum
         pinchOpensFiles = (try? c.decode(Bool.self, forKey: .pinchOpensFiles)) ?? d.pinchOpensFiles
+        dictation = (try? c.decode(Bool.self, forKey: .dictation)) ?? d.dictation
+        dictateHoldMS = (try? c.decode(Double.self, forKey: .dictateHoldMS)) ?? d.dictateHoldMS
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
