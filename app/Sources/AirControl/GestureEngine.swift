@@ -14,6 +14,7 @@ struct GestureState {
     var scrollGrab = false         // fist (thumb tucked) — grab the page and scroll
     var scrollPoint: CGPoint = .zero // UNCLAMPED remap of the fist — scrolling works past the box edge
     var pointerHeld = false        // scroll or its clutch grace: the pointer must not move
+    var handTiltDown = false       // knuckles rotated clearly below the wrist (tilt-to-send)
     var extendedCount = 0
     var swiping = false
     var swipeArmed = false         // palm paused long enough — stroke will count
@@ -150,6 +151,13 @@ final class GestureEngine {
         s.pinchRaw = raw
         s.pinchSmooth = smooth
         s.pinching = pinching
+
+        // --- Hand tilt (wrist → middle knuckle pointing down): the only
+        // gesture axis that reads wrist ORIENTATION, so it conflicts with
+        // nothing — used by tilt-to-send while a pinch is held.
+        let tiltDX = Double(middleMCP.x - f.wrist.x)
+        let tiltDY = Double(middleMCP.y - f.wrist.y)
+        s.handTiltDown = tiltDY < 0 && abs(tiltDY) > abs(tiltDX) * config.tiltSendRatio
 
         // --- Finger extension: tip farther from wrist than PIP by a factor.
         // Naturally mutually exclusive with a pinch (pinch curls the index).

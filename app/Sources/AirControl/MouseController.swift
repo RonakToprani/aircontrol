@@ -199,6 +199,34 @@ final class MouseController {
         lastHideAssert = 0
     }
 
+    /// Tilt-to-send: press Return, but ONLY when something text-editable has
+    /// keyboard focus — a stray tilted pinch on the desktop must do nothing.
+    /// The focus check runs off the render loop; the key posts on its answer.
+    func pressReturnIfTextFocused() {
+        axQueue.async { [weak self] in
+            guard let self, Self.focusedElementIsText() else { return }
+            DispatchQueue.main.async {
+                let down = CGEvent(keyboardEventSource: self.source, virtualKey: 36, keyDown: true)
+                down?.post(tap: .cghidEventTap)
+                let up = CGEvent(keyboardEventSource: self.source, virtualKey: 36, keyDown: false)
+                up?.post(tap: .cghidEventTap)
+            }
+        }
+    }
+
+    private static func focusedElementIsText() -> Bool {
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString,
+                                            &focusedRef) == .success,
+              let focusedRef, CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
+        else { return false }
+        let el = focusedRef as! AXUIElement
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(el, kAXRoleAttribute as CFString, &roleRef) == .success,
+              let role = roleRef as? String else { return false }
+        return isTextRole(role, element: el)
+    }
+
     /// Types a string into whatever has keyboard focus, as synthetic unicode
     /// key events — works identically in native apps, browsers, and Electron.
     /// Chunked on character boundaries (the event API caps the payload).

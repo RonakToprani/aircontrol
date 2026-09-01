@@ -99,6 +99,10 @@ struct TuningView: View {
                     .font(.caption)
                 slider("Dictation hold (ms)", $store.config.dictateHoldMS, 200...1000, "%.0f",
                        help: "Pinch a text box and hold still this long — mic goes live while you hold, release types what you said. On-device recognition.")
+                Toggle("Tilt to send (⏎ on release)", isOn: $store.config.tiltSend)
+                    .font(.caption)
+                slider("Tilt strictness", $store.config.tiltSendRatio, 0.8...3.0, "%.1f",
+                       help: "Pinch, tilt your hand down until 'release to send' shows, release — only fires when a text field has focus. Higher = more vertical required.")
             }
             Section("4-finger swipe") {
                 slider("Travel distance", $store.config.swipeDist, 0.05...0.4, "%.2f")
