@@ -87,6 +87,8 @@ struct TuningView: View {
                        help: "Make a fist (thumb tucked in) to grab the page; hand motion scrolls it")
                 slider("Fist arm time (ms)", $store.config.scrollArmMS, 0...400, "%.0f",
                        help: "Fist must hold this long before scrolling starts — rides out a pinch forming")
+                slider("Scroll clutch (ms)", $store.config.scrollClutchMS, 200...2000, "%.0f",
+                       help: "After opening the fist, re-fist within this to keep scrolling — pointer stays frozen while you bring your hand back")
                 Toggle("Natural scroll (content follows hand)", isOn: $store.config.scrollNatural)
                     .font(.caption)
                 Toggle("Scroll momentum (coasts after release)", isOn: $store.config.scrollMomentum)

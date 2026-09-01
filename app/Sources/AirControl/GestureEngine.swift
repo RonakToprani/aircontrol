@@ -12,6 +12,8 @@ struct GestureState {
     var pinchSmooth: Double = 0
     var pinching = false
     var scrollGrab = false         // fist (thumb tucked) — grab the page and scroll
+    var scrollPoint: CGPoint = .zero // UNCLAMPED remap of the fist — scrolling works past the box edge
+    var pointerHeld = false        // scroll or its clutch grace: the pointer must not move
     var extendedCount = 0
     var swiping = false
     var swipeArmed = false         // palm paused long enough — stroke will count
@@ -35,6 +37,7 @@ final class GestureEngine {
     private var scrollGrab = false
     private var fistSince: CFTimeInterval?
     private var fistGoneSince: CFTimeInterval?
+    private var clutchUntil: CFTimeInterval = -1e9
     private var palmHist: [(t: CFTimeInterval, x: Double, y: Double)] = []
     private var lastPalmT: CFTimeInterval = 0
     private var lastSwipeTime: CFTimeInterval = -1e9
@@ -85,11 +88,15 @@ final class GestureEngine {
             if now - lastSeen > handLostReset {
                 pinching = false
                 pinchSmooth = nil
+                if scrollGrab { // fist slid out of frame mid-scroll: clutch
+                    clutchUntil = now + config.scrollClutchMS / 1000
+                }
                 scrollGrab = false
                 fistSince = nil
             }
             s.pinching = pinching
             s.scrollGrab = scrollGrab
+            s.pointerHeld = config.mouseMode && (scrollGrab || now < clutchUntil)
             return s
         }
         lastSeen = now
@@ -138,6 +145,7 @@ final class GestureEngine {
             if smooth > config.pinchThresh + config.pinchHyst { pinching = false }
         } else if smooth < config.pinchThresh, !scrollGrab {
             pinching = true // a scroll fist curling tighter can't become a click
+            clutchUntil = -1e9 // a deliberate pinch ends the scroll clutch
         }
         s.pinchRaw = raw
         s.pinchSmooth = smooth
@@ -170,7 +178,8 @@ final class GestureEngine {
         // (the overlay's deferred mouse-down means no click ever posted).
         // A brief release grace rides out single-frame curl dropouts.
         let thumbOut = dist(f.thumbTip, f.indexMCP) / handSize > 0.6
-        let fistPose = curlFlags[0] && curlFlags[1] && curlFlags[2] && curlFlags[3] && !thumbOut
+        let fistPose = config.mouseMode
+            && curlFlags[0] && curlFlags[1] && curlFlags[2] && curlFlags[3] && !thumbOut
         if fistPose {
             fistGoneSince = nil
             if fistSince == nil { fistSince = now }
@@ -179,7 +188,13 @@ final class GestureEngine {
             fistSince = nil
             if scrollGrab {
                 if fistGoneSince == nil { fistGoneSince = now }
-                if now - fistGoneSince! > 0.1 { scrollGrab = false }
+                if now - fistGoneSince! > 0.1 {
+                    scrollGrab = false
+                    // Clutch: opening the fist starts a grace window — bring
+                    // the hand back and re-fist to KEEP scrolling, pointer
+                    // frozen throughout, like lifting a mouse to re-center.
+                    clutchUntil = now + config.scrollClutchMS / 1000
+                }
             }
         }
         if scrollGrab {
@@ -188,6 +203,8 @@ final class GestureEngine {
             s.pinching = false
         }
         s.scrollGrab = scrollGrab
+        s.scrollPoint = remap(f.indexMCP, config: config, clamped: false)
+        s.pointerHeld = config.mouseMode && (scrollGrab || now < clutchUntil)
 
         // --- ✌ to turn off: index+middle extended, ring+little folded, held
         // with a visible meter — passing through the shape while opening or
@@ -352,17 +369,19 @@ final class GestureEngine {
     /// Camera space → [0,1] hand range: the calibrated comfortable rect when
     /// one exists (PLAN §5.4 — small personal box, full desktop reach, no
     /// stretching), else the symmetric edge-margin default.
-    private func remap(_ p: CGPoint, config: Config) -> CGPoint {
+    private func remap(_ p: CGPoint, config: Config, clamped: Bool = true) -> CGPoint {
+        let raw: CGPoint
         if let c = config.calibration {
             let w = CGFloat(max(c.maxX - c.minX, 0.05))
             let h = CGFloat(max(c.maxY - c.minY, 0.05))
-            return CGPoint(x: min(max((p.x - CGFloat(c.minX)) / w, 0), 1),
-                           y: min(max((p.y - CGFloat(c.minY)) / h, 0), 1))
+            raw = CGPoint(x: (p.x - CGFloat(c.minX)) / w, y: (p.y - CGFloat(c.minY)) / h)
+        } else {
+            let m = CGFloat(config.margin)
+            let span = max(1 - 2 * m, 0.01)
+            raw = CGPoint(x: (p.x - m) / span, y: (p.y - m) / span)
         }
-        let m = CGFloat(config.margin)
-        let span = max(1 - 2 * m, 0.01)
-        return CGPoint(x: min(max((p.x - m) / span, 0), 1),
-                       y: min(max((p.y - m) / span, 0), 1))
+        guard clamped else { return raw } // scroll keeps working past the box edge
+        return CGPoint(x: min(max(raw.x, 0), 1), y: min(max(raw.y, 0), 1))
     }
 
     private func dist(_ a: CGPoint, _ b: CGPoint) -> Double {

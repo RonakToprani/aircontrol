@@ -38,6 +38,7 @@ final class PointerMapper {
     private var lastCrossDir = (dx: 0, dy: 0)
     private var lastScreenReturned: NSScreen?
     private var pinchLast: CGPoint?
+    private var holdLast: CGPoint?
     private var precisionOffset = CGVector.zero
 
     /// Speed band for precision-on-pinch, in hand-ranges/second: at or below
@@ -48,16 +49,30 @@ final class PointerMapper {
     private let precisionSpeedHi = 1.0
 
     func map(pointerNorm pIn: CGPoint, anchorNorm aIn: CGPoint, pinching: Bool,
-             config: Config, now: CFTimeInterval) -> MappedPointer {
+             hold: Bool = false, config: Config, now: CFTimeInterval) -> MappedPointer {
         // Hand speed drives both precision gain and offset decay.
         let dt = now - lastTime
         var speed = 0.0
-        if let ln = lastNorm, dt < 0.2 {
+        let prev = lastNorm
+        if let ln = prev, dt < 0.2 {
             speed = Double(hypot(pIn.x - ln.x, pIn.y - ln.y)) / max(dt, 1e-3)
         }
         lastNorm = pIn
         lastTime = now
 
+        // Pointer hold (scroll grab + clutch): ALL hand motion is swallowed
+        // into the offset, so the pointer stays exactly where it froze — the
+        // hand can travel, LEAVE THE FRAME, and come back without moving it
+        // (holdLast bridges dropouts, so re-entry can't jump). Afterward the
+        // offset decays with hand speed like every other re-anchor here.
+        if hold {
+            if let lh = holdLast {
+                precisionOffset.dx += lh.x - pIn.x
+                precisionOffset.dy += lh.y - pIn.y
+            }
+            holdLast = pIn
+            pinchLast = nil
+        } else
         // Precision-on-pinch (PLAN §5.2), speed-adaptive: slow drag motion is
         // scaled down (steady placement); fast motion passes through 1:1. The
         // scaling accumulates as an offset which, after release, DECAYS away
@@ -77,6 +92,7 @@ final class PointerMapper {
             precisionOffset.dx *= 1 - decay
             precisionOffset.dy *= 1 - decay
         }
+        if !hold { holdLast = nil }
         let p = CGPoint(x: pIn.x + precisionOffset.dx, y: pIn.y + precisionOffset.dy)
         let a = CGPoint(x: aIn.x + precisionOffset.dx, y: aIn.y + precisionOffset.dy)
 

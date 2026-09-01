@@ -173,9 +173,11 @@ final class OverlayView: NSView {
     private var pointer: CGPoint?
     private var anchor: CGPoint?
 
-    // Scroll grab (mouse mode): the ring freezes while this eased shadow
-    // point keeps following the hand — its per-frame delta becomes wheel
-    // pixels, and its velocity carries the momentum tail after release.
+    // Scroll grab (mouse mode): the pointer mapping freezes (mapper hold)
+    // while this eased shadow follows the UNCLAMPED hand position — its
+    // per-frame delta becomes wheel pixels even past the calibration box,
+    // and its velocity carries the momentum tail after release.
+    private var scrollNormTarget: CGPoint = .zero
     private var scrollEased: CGPoint?
     private var scrollVel = CGVector.zero
 
@@ -340,7 +342,8 @@ final class OverlayView: NSView {
         guard s.handVisible else { return }
         lastSeen = CACurrentMediaTime()
         let m = mapper.map(pointerNorm: s.pointer, anchorNorm: s.anchor, pinching: s.pinching,
-                           config: configProvider(), now: lastSeen)
+                           hold: s.pointerHeld, config: configProvider(), now: lastSeen)
+        scrollNormTarget = s.scrollPoint
         if m.screenChanged {
             onActiveScreenChange?(m.screen)
             pointer = nil // re-seed eased positions in the new window's coords
@@ -387,10 +390,10 @@ final class OverlayView: NSView {
         let dt = max(link.targetTimestamp - link.timestamp, 1.0 / 240.0)
         let k = 1 - pow(1 - CGFloat(config.posAlpha), CGFloat(dt * 60))
 
-        // While scroll-grabbing, the ring holds still — the hand's motion is
-        // scrolling content, not pointing. It glides back to the hand after.
+        // While scroll-grabbing (and through the clutch), the mapper holds
+        // the pointer target frozen — easing just keeps the ring settled.
         let scrollHold = config.mouseMode && state.scrollGrab && handFresh
-        if let t = pointerTarget, !scrollHold {
+        if let t = pointerTarget {
             var p = pointer ?? t
             p.x += (t.x - p.x) * k
             p.y += (t.y - p.y) * k
@@ -601,16 +604,17 @@ final class OverlayView: NSView {
     /// release the tracked velocity decays out as a trackpad-style coast.
     /// Natural direction = content follows the hand.
     private func stepScroll(config: Config, dt: CFTimeInterval, k: CGFloat, active: Bool) {
-        if active, let t = pointerTarget {
-            var e = scrollEased ?? pointer ?? t
+        if active {
+            let t = scrollNormTarget
+            var e = scrollEased ?? t
             let old = e
             e.x += (t.x - e.x) * k
             e.y += (t.y - e.y) * k
             scrollEased = e
             let sign: CGFloat = config.scrollNatural ? -1 : 1
             let g = CGFloat(config.scrollGain) * sign
-            let dx = (e.x - old.x) * g
-            let dy = (e.y - old.y) * g
+            let dx = (e.x - old.x) * bounds.width * g
+            let dy = (e.y - old.y) * bounds.height * g
             mouse.scroll(dx: dx, dy: dy)
             let f = CGFloat(1.0 / (dt * 60)) // velocity per 60fps frame
             scrollVel.dx = scrollVel.dx * 0.7 + dx * f * 0.3

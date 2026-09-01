@@ -62,6 +62,7 @@ struct Config: Codable, Equatable {
     var shakaHoldMS: Double = 1100     // hold the shaka this long to toggle
     var scrollGain: Double = 2.0       // scroll pixels per pointer-pixel of hand travel
     var scrollArmMS: Double = 120      // fist must hold this long before it grabs the page
+    var scrollClutchMS: Double = 900   // after opening the fist, re-fist within this to keep scrolling (pointer stays frozen)
     var scrollNatural: Bool = true     // content follows the hand (trackpad-style)
     var scrollMomentum: Bool = true    // scroll coasts briefly after release
     var pinchOpensFiles: Bool = true   // clean pinch on a Finder file item auto-double-clicks
@@ -120,6 +121,7 @@ struct Config: Codable, Equatable {
         shakaHoldMS = (try? c.decode(Double.self, forKey: .shakaHoldMS)) ?? d.shakaHoldMS
         scrollGain = (try? c.decode(Double.self, forKey: .scrollGain)) ?? d.scrollGain
         scrollArmMS = (try? c.decode(Double.self, forKey: .scrollArmMS)) ?? d.scrollArmMS
+        scrollClutchMS = (try? c.decode(Double.self, forKey: .scrollClutchMS)) ?? d.scrollClutchMS
         scrollNatural = (try? c.decode(Bool.self, forKey: .scrollNatural)) ?? d.scrollNatural
         scrollMomentum = (try? c.decode(Bool.self, forKey: .scrollMomentum)) ?? d.scrollMomentum
         pinchOpensFiles = (try? c.decode(Bool.self, forKey: .pinchOpensFiles)) ?? d.pinchOpensFiles
