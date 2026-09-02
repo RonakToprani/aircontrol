@@ -20,9 +20,10 @@ UNIVERSAL := .build/apple/Products/Release/$(APP)
 dist:
 	swift build -c release --arch arm64 --arch x86_64
 	rm -rf dist
-	mkdir -p dist/stage/$(APP).app/Contents/MacOS
+	mkdir -p dist/stage/$(APP).app/Contents/MacOS dist/stage/$(APP).app/Contents/Resources
 	cp Info.plist dist/stage/$(APP).app/Contents/Info.plist
 	cp $(UNIVERSAL) dist/stage/$(APP).app/Contents/MacOS/$(APP)
+	cp AppIcon.icns dist/stage/$(APP).app/Contents/Resources/AppIcon.icns
 	codesign --force --sign "$(IDENTITY)" dist/stage/$(APP).app
 	cp "READ ME FIRST.txt" dist/stage/
 	ln -s /Applications dist/stage/Applications
@@ -35,9 +36,10 @@ run: bundle
 
 bundle: build
 	rm -rf $(BUNDLE)
-	mkdir -p $(BUNDLE)/Contents/MacOS
+	mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources
 	cp Info.plist $(BUNDLE)/Contents/Info.plist
 	cp $(BINARY) $(BUNDLE)/Contents/MacOS/$(APP)
+	cp AppIcon.icns $(BUNDLE)/Contents/Resources/AppIcon.icns
 	codesign --force --sign "$(IDENTITY)" $(BUNDLE)
 
 build:
