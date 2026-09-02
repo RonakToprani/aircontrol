@@ -164,6 +164,9 @@ final class ConfigStore: ObservableObject {
         } else {
             config = Config()
         }
+        // Mouse mode is per-session: every launch starts in gesture mode,
+        // whatever mode the app quit in — 🤙 or the menu turns it on.
+        config.mouseMode = false
     }
 
     func resetToDefaults() {
