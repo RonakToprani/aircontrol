@@ -7,7 +7,7 @@ Control macOS windows and virtual desktops with in-air hand gestures captured by
 Works on any Mac running macOS 14 (Sonoma) or newer. Paste this in Terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RonakToprani/aircontrol/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/RonakToprani/aircontrol/production/install.sh | sh
 ```
 
 That's the whole install — no "Open Anyway" dance (terminal downloads skip Gatekeeper's quarantine), and re-running the same command updates you to the latest release. A dedicated domain will front this URL later. Homebrew, once the tap repo is up:

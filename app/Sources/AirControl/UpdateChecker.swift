@@ -6,7 +6,7 @@ import AppKit
 /// version string). This is a privacy promise, not an implementation detail.
 enum UpdateChecker {
     private static let versionURL =
-        URL(string: "https://raw.githubusercontent.com/RonakToprani/aircontrol/main/VERSION")!
+        URL(string: "https://raw.githubusercontent.com/RonakToprani/aircontrol/production/VERSION")!
     private static let releasesURL =
         URL(string: "https://github.com/RonakToprani/aircontrol/releases/latest")!
 

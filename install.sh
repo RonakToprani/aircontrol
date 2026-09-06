@@ -1,7 +1,7 @@
 #!/bin/bash
 # AirControl one-line installer / updater.
 #
-#   curl -fsSL https://raw.githubusercontent.com/RonakToprani/aircontrol/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/RonakToprani/aircontrol/production/install.sh | sh
 #
 # Downloads the latest release DMG, verifies its checksum when one is
 # published, installs to /Applications, and strips the quarantine flag a
