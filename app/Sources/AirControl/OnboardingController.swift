@@ -36,11 +36,6 @@ final class OnboardingController: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
-    func close() {
-        window.delegate = nil
-        window.close()
-    }
-
     func windowWillClose(_ notification: Notification) {
         // Closing the tour at any point counts as "seen" — never nag again.
         UserDefaults.standard.set(true, forKey: "aircontrol.onboarded")
@@ -82,13 +77,11 @@ final class OnboardingModel: ObservableObject {
     private var lastPointer: CGPoint?
     private var travel: CGFloat = 0
     private var sawPinch = false
-    private var lastMouseMode: Bool
 
     init() {
-        lastMouseMode = app.configStore.config.mouseMode
         calibrated = app.configStore.config.calibration != nil
         enabled = app.enabled
-        mouseModeOn = lastMouseMode
+        mouseModeOn = app.configStore.config.mouseMode
 
         app.$handVisible
             .receive(on: DispatchQueue.main)
@@ -113,17 +106,16 @@ final class OnboardingModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] config in
                 guard let self else { return }
-                self.mouseModeOn = config.mouseMode
-                if config.calibration != nil, !self.calibrated {
-                    self.calibrated = true
-                    if self.step == .calibrate { self.advance(after: 1.2) }
-                }
                 // 🤙 drill: the shaka's observable effect IS the mode flip.
-                if config.mouseMode != self.lastMouseMode {
-                    self.lastMouseMode = config.mouseMode
+                if config.mouseMode != self.mouseModeOn {
+                    self.mouseModeOn = config.mouseMode
                     if self.step == .practice, self.currentDrill == .shaka {
                         self.complete(.shaka)
                     }
+                }
+                if config.calibration != nil, !self.calibrated {
+                    self.calibrated = true
+                    if self.step == .calibrate { self.advance(after: 1.2) }
                 }
             }
             .store(in: &cancellables)
@@ -133,7 +125,8 @@ final class OnboardingModel: ObservableObject {
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+                let cam = AVCaptureDevice.authorizationStatus(for: .video)
+                if cam != self.cameraStatus { self.cameraStatus = cam }
                 let trusted = SpaceSwitcher.isTrusted
                 if trusted != self.axTrusted {
                     self.axTrusted = trusted
@@ -174,8 +167,7 @@ final class OnboardingModel: ObservableObject {
     @Published var startedCalibration = false
 
     func finish() {
-        UserDefaults.standard.set(true, forKey: "aircontrol.onboarded")
-        onFinish?()
+        onFinish?() // closes the window; windowWillClose records "onboarded"
     }
 
     // MARK: auto-advance plumbing
@@ -188,8 +180,13 @@ final class OnboardingModel: ObservableObject {
     private func advance(after delay: TimeInterval) {
         guard !advancing else { return }
         advancing = true
+        // Snapshot the step: if the user clicks Continue/Skip before this
+        // fires, next() already moved on and a second next() would silently
+        // skip a whole step (e.g. straight past Accessibility).
+        let from = step
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.next()
+            guard let self, self.step == from else { return }
+            self.next()
         }
     }
 

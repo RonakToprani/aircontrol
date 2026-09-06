@@ -12,7 +12,8 @@ set -euo pipefail
 
 REPO="RonakToprani/aircontrol"
 API="https://api.github.com/repos/$REPO/releases/latest"
-FALLBACK_DMG="https://github.com/$REPO/releases/latest/download/AirControl-0.3.0.dmg"
+# Pinned to its own tag (not releases/latest) so it still resolves after newer releases ship.
+FALLBACK_DMG="https://github.com/$REPO/releases/download/v0.3.0/AirControl-0.3.0.dmg"
 APP="/Applications/AirControl.app"
 
 bold=$(printf '\033[1m'); green=$(printf '\033[32m'); red=$(printf '\033[31m')
@@ -41,16 +42,26 @@ trap 'rm -rf "$tmp"; [ -n "${mountpoint:-}" ] && hdiutil detach "$mountpoint" -q
 
 release_json=$(curl -fsSL "$API" 2>/dev/null || true)
 
+# `|| true` on each: under `set -euo pipefail` a no-match grep would otherwise
+# kill the script silently before the fallback below ever runs.
 dmg_url=$(printf '%s' "$release_json" \
   | grep -o '"browser_download_url": *"[^"]*\.dmg"' \
-  | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')
+  | head -1 | sed 's/.*"\(https[^"]*\)"/\1/' || true)
 sums_url=$(printf '%s' "$release_json" \
   | grep -o '"browser_download_url": *"[^"]*checksums\.txt"' \
-  | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')
+  | head -1 | sed 's/.*"\(https[^"]*\)"/\1/' || true)
 
 if [ -z "$dmg_url" ]; then
-  warn "Couldn't query GitHub for the latest release — using the pinned URL."
-  dmg_url="$FALLBACK_DMG"
+  # API unreachable/rate-limited: derive the release URL from the published
+  # VERSION file so the fallback tracks releases; the pinned URL is last resort.
+  ver=$(curl -fsSL "https://raw.githubusercontent.com/$REPO/production/VERSION" 2>/dev/null | tr -d '[:space:]' || true)
+  if [ -n "$ver" ]; then
+    warn "Couldn't query GitHub for the latest release — using version $ver from the repo."
+    dmg_url="https://github.com/$REPO/releases/download/v$ver/AirControl-$ver.dmg"
+  else
+    warn "Couldn't query GitHub for the latest release — using the pinned URL."
+    dmg_url="$FALLBACK_DMG"
+  fi
 fi
 
 # --- Download + verify ------------------------------------------------------
@@ -61,7 +72,7 @@ curl -fL --progress-bar "$dmg_url" -o "$tmp/AirControl.dmg" \
 ok "downloaded"
 
 if [ -n "$sums_url" ] && curl -fsSL "$sums_url" -o "$tmp/checksums.txt" 2>/dev/null; then
-  expected=$(grep "${dmg_url##*/}" "$tmp/checksums.txt" | awk '{print $1}' | head -1)
+  expected=$(grep "${dmg_url##*/}" "$tmp/checksums.txt" | awk '{print $1}' | head -1 || true)
   actual=$(shasum -a 256 "$tmp/AirControl.dmg" | awk '{print $1}')
   if [ -n "$expected" ]; then
     [ "$expected" = "$actual" ] || fail "Checksum mismatch — the download doesn't match the published release. Aborting."
@@ -82,8 +93,10 @@ if pgrep -xq AirControl; then
   ok "quit the running copy"
 fi
 
-mountpoint=$(hdiutil attach "$tmp/AirControl.dmg" -nobrowse -readonly -quiet \
-  | grep -o '/Volumes/.*' | head -1)
+# No -quiet: it suppresses the mount table entirely, leaving nothing to parse.
+# The substitution captures hdiutil's output, so nothing extra hits the terminal.
+mountpoint=$(hdiutil attach "$tmp/AirControl.dmg" -nobrowse -readonly \
+  | grep -o '/Volumes/.*' | head -1 || true)
 [ -n "$mountpoint" ] && [ -d "$mountpoint/AirControl.app" ] \
   || fail "The downloaded DMG doesn't contain AirControl.app."
 

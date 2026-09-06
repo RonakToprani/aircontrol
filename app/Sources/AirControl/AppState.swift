@@ -44,6 +44,7 @@ final class AppState: ObservableObject {
     private var lastHandTime: CFTimeInterval = 0
     private var suspendedForSleep = false
     private var screenChangeWork: DispatchWorkItem?
+    private var wakeWork: DispatchWorkItem?
 
     // Pinch-corner calibration flow (PLAN §5.4).
     private enum CalStage { case idle, waitTopLeft, waitBottomRight }
@@ -150,35 +151,54 @@ final class AppState: ObservableObject {
     @objc private func handleWake() {
         guard enabled, suspendedForSleep else { return }
         suspendedForSleep = false
-        // Give the camera a moment to come back with the system.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        // Give the camera a moment to come back with the system. Cancellable:
+        // if the user toggles off→on during the delay, start() launches the
+        // session itself and this stale item must not double-launch.
+        wakeWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
             guard let self, self.enabled, !self.suspendedForSleep else { return }
             self.launchSession()
         }
+        wakeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
 
     @objc private func handleScreenChange() {
         guard enabled, !suspendedForSleep else { return }
         screenChangeWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self, self.enabled else { return }
+            // !suspendedForSleep: a lid close fires a screen change right
+            // before willSleep — the debounced item must not resurrect the
+            // overlay into a torn-down session.
+            guard let self, self.enabled, !self.suspendedForSleep else { return }
             // Drop any in-flight window drag where it stands, then rebuild the
             // overlay windows onto the new screen arrangement.
             self.mover.endDrag(at: nil)
-            self.overlay?.close()
-            let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
-                                            configProvider: { [configStore = self.configStore] in configStore.config },
-                                            mover: self.mover)
-            self.overlay = overlay
-            overlay.show()
+            self.rebuildOverlay()
         }
         screenChangeWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
     }
 
+    /// Closes any existing overlay and builds a fresh one for the current
+    /// screen arrangement — the single construction site, shared by session
+    /// launch and display hot-plug.
+    private func rebuildOverlay() {
+        overlay?.close()
+        let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
+                                        configProvider: { [configStore] in configStore.config },
+                                        mover: mover)
+        self.overlay = overlay
+        overlay.show()
+    }
+
     /// Stops the camera and tears down the overlay without changing `enabled`
     /// — the shared path for sleep and for a full stop.
     private func teardownSession() {
+        screenChangeWork?.cancel()
+        screenChangeWork = nil
+        wakeWork?.cancel()
+        wakeWork = nil
         tracker.stop()
         tracker.setIdle(false)
         resting = false
@@ -194,11 +214,7 @@ final class AppState: ObservableObject {
     /// Reused by first enable and by wake-from-sleep.
     private func launchSession() {
         lastHandTime = CACurrentMediaTime()
-        let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
-                                        configProvider: { [configStore] in configStore.config },
-                                        mover: mover)
-        self.overlay = overlay
-        overlay.show()
+        rebuildOverlay()
 
         tracker.onFrame = { [weak self] frame in
             DispatchQueue.main.async {
@@ -390,9 +406,8 @@ final class AppState: ObservableObject {
         calStage = .idle
         suspendedForSleep = false
         cameraInterrupted = false
-        screenChangeWork?.cancel()
         tracker.onFrame = nil
-        teardownSession()
+        teardownSession() // also cancels pending screen-change / wake work
     }
 
     /// The preview panel exists only while enabled AND requested — the camera

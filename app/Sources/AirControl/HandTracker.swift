@@ -17,6 +17,9 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     private let queue = DispatchQueue(label: "aircontrol.camera", qos: .userInteractive)
     private let request = VNDetectHumanHandPoseRequest()
     private var configured = false
+    /// Whether capture is *supposed* to be running (set by start/stop, on the
+    /// camera queue) — the runtime-error restart must never outlive a stop().
+    private var wantsRunning = false
 
     // Idle rest: while resting we still receive every camera frame but run
     // Vision on only every Nth, cutting the app's biggest energy cost when no
@@ -67,7 +70,10 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     @objc private func sessionRuntimeError() {
         // A transient capture error — give the session one gentle restart.
         queue.asyncAfter(deadline: .now() + 0.5) {
-            guard self.configured, !self.session.isRunning else { return }
+            // wantsRunning: if the user disabled (or the Mac slept) since the
+            // error, restarting would relight the camera while the menu says
+            // Off — the one thing this app must never do.
+            guard self.configured, self.wantsRunning, !self.session.isRunning else { return }
             self.session.startRunning()
         }
     }
@@ -101,6 +107,7 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
 
     func stop() {
         queue.async {
+            self.wantsRunning = false
             self.session.stopRunning()
             self.lastDetectionTime = 0
             self.fpsEMA = 0
@@ -135,6 +142,7 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
             session.commitConfiguration()
             configured = true
         }
+        wantsRunning = true
         session.startRunning()
         onStatus(nil)
     }

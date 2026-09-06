@@ -18,6 +18,8 @@ UNIVERSAL := .build/apple/Products/Release/$(APP)
 # notarization, recipients must approve it once in System Settings → Privacy
 # & Security → "Open Anyway" (covered in READ ME FIRST.txt).
 dist:
+	@[ "$$(tr -d '[:space:]' < ../VERSION)" = "$(VERSION)" ] \
+		|| { echo "✗ VERSION file ($$(cat ../VERSION)) != Info.plist CFBundleShortVersionString ($(VERSION)) — the update check compares these; bump both."; exit 1; }
 	swift build -c release --arch arm64 --arch x86_64
 	rm -rf dist
 	mkdir -p dist/stage/$(APP).app/Contents/MacOS dist/stage/$(APP).app/Contents/Resources
