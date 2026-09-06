@@ -403,9 +403,9 @@ struct OnboardingView: View {
                 drillRow(.thumb, symbol: "hand.point.left", title: "Point your thumb between desktops",
                          hint: "Fist, thumb out sideways, hold — practicing here won't switch anything")
                 drillRow(.shaka, symbol: "hand.wave", title: "Shaka 🤙 for mouse mode",
-                         hint: "Thumb + little finger out, hold until the meter fills")
+                         hint: "Palm facing you — thumb + little finger out, hold until the meter fills")
                 drillRow(.scroll, symbol: "scroll", title: "Fist to scroll",
-                         hint: model.mouseModeOn ? "Close your fist, thumb tucked, and move"
+                         hint: model.mouseModeOn ? "Close your fist (thumb tucked) and move — watch the Scroll practice window"
                                                  : "Needs mouse mode — do the 🤙 first")
             }
             HStack(spacing: 10) {
@@ -431,7 +431,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 6) {
                 cheat("Open hand", "move the cursor")
                 cheat("Pinch", "click · hold to drag windows")
-                cheat("🤙 hold", "mouse mode on / off")
+                cheat("🤙 hold, palm facing you", "mouse mode on / off")
                 cheat("Fist (thumb in)", "scroll · in mouse mode")
                 cheat("Pinch-hold a text box", "dictate · release to type · 👍 to send")
                 cheat("Fist + thumb sideways", "switch desktop")

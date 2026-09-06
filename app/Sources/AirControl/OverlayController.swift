@@ -139,6 +139,47 @@ private final class MockWindowLayer: CALayer {
         frame.contains(p)
     }
 
+    // MARK: scrollable practice content
+
+    private var stripes: CALayer?
+    private var stripesBaseY: CGFloat = 0
+    private var scrollPhase: CGFloat = 0
+    private let stripePitch: CGFloat = 34
+    var scrollable: Bool { stripes != nil }
+
+    /// Fake document rows inside the window body — the tour's scroll drill
+    /// moves these instead of any real content, wrapping seamlessly so the
+    /// "page" never runs out.
+    func addScrollContent() {
+        let clip = CALayer()
+        clip.frame = CGRect(x: 1.5, y: 1.5, width: bounds.width - 3, height: bounds.height - 33)
+        clip.masksToBounds = true
+        clip.cornerRadius = 9
+        let content = CALayer()
+        content.frame = clip.bounds
+        let rows = Int(clip.bounds.height / stripePitch) + 3
+        for i in -1..<rows {
+            let row = CALayer()
+            let trim = CGFloat(((i % 3) + 3) % 3) * 44 // varied lengths read as text
+            row.frame = CGRect(x: 16, y: CGFloat(i) * stripePitch + 8,
+                               width: clip.bounds.width - 32 - trim, height: 16)
+            row.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.10).cgColor
+            row.cornerRadius = 5
+            content.addSublayer(row)
+        }
+        clip.addSublayer(content)
+        addSublayer(clip)
+        stripes = content
+        stripesBaseY = content.position.y
+    }
+
+    /// wheel-pixel delta in, wrapped row motion out.
+    func scrollContent(byWheel dy: CGFloat) {
+        guard let content = stripes else { return }
+        scrollPhase = (scrollPhase + dy).truncatingRemainder(dividingBy: stripePitch)
+        content.position.y = stripesBaseY - scrollPhase
+    }
+
     func setLook(hovered: Bool, grabbed: Bool) {
         if grabbed {
             borderColor = NSColor.systemTeal.cgColor
@@ -263,12 +304,13 @@ final class OverlayView: NSView {
         seamBarBack.addSublayer(seamBarFill)
         layer?.addSublayer(seamBarBack)
 
-        let notes = MockWindowLayer(title: "Mock window A", size: CGSize(width: 380, height: 250), tint: .systemTeal)
+        let notes = MockWindowLayer(title: "Practice window", size: CGSize(width: 380, height: 250), tint: .systemTeal)
         notes.center = CGPoint(x: frame.width * 0.3, y: frame.height * 0.55)
         notes.target = notes.center
-        let browser = MockWindowLayer(title: "Mock window B", size: CGSize(width: 420, height: 280), tint: .systemOrange)
+        let browser = MockWindowLayer(title: "Scroll practice", size: CGSize(width: 420, height: 280), tint: .systemOrange)
         browser.center = CGPoint(x: frame.width * 0.68, y: frame.height * 0.42)
         browser.target = browser.center
+        browser.addScrollContent()
         mockWindows = [notes, browser]
         mockWindows.forEach { mockHost.addSublayer($0) }
 
@@ -436,7 +478,18 @@ final class OverlayView: NSView {
         // --- Mouse mode: the eased pointer drives the REAL cursor; pinch is
         // the left button. Grab/hover is suspended — pinch must mean exactly
         // one thing, and pinch-dragging a title bar moves windows natively.
-        if config.mouseMode {
+        // With the practice sandbox on, mouse mode goes VISUAL-ONLY: no
+        // CGEvents post, the system cursor stays put, the fist scrolls the
+        // practice pane — the welcome tour can teach without touching
+        // anything real.
+        let sandbox = config.useMockWindows
+        if config.mouseMode, sandbox {
+            mouse.setCursorHidden(false)
+            mouse.releaseIfNeeded()
+            if dictating { abortDictation() }
+            stepScroll(config: config, dt: dt, k: k,
+                       active: scrollHold && !state.settling, sandbox: true)
+        } else if config.mouseMode {
             mouse.dragSlopPx = CGFloat(config.mouseDragSlopPx)
             mouse.downDelay = config.mouseDownDelayMS / 1000
             mouse.setCursorHidden(config.hideSystemCursor)
@@ -486,11 +539,13 @@ final class OverlayView: NSView {
         }
 
         // --- Grab / drag (knuckle-driven, so the pinch curl doesn't lurch it).
-        let mocksOn = config.useMockWindows && !config.mouseMode
+        // The practice windows work in BOTH modes — during the tour a pinch
+        // always grabs something safe, never a real window.
+        let mocksOn = config.useMockWindows
         mockHost.isHidden = !mocksOn
         let hoverActive: Bool
 
-        if config.mouseMode {
+        if config.mouseMode, !mocksOn {
             grabbed = nil
             if grabbedTarget != nil { // mode flipped mid-AX-drag: drop in place
                 mover.endDrag(at: lastDragOrigin)
@@ -501,6 +556,12 @@ final class OverlayView: NSView {
             ghost.opacity = 0
             hoverActive = false
         } else if mocksOn {
+            if grabbedTarget != nil { // entering the sandbox mid-AX-drag
+                mover.endDrag(at: lastDragOrigin)
+                grabbedTarget = nil
+            }
+            hoveredTarget = nil
+            latestHover = nil
             ghost.opacity = 0
             if state.pinching, !wasPinching, handFresh, let p = pointer, let a = anchor {
                 if let win = mockWindows.last(where: { $0.containsInSuperlayer(p) }) {
@@ -663,7 +724,8 @@ final class OverlayView: NSView {
     /// supplies smooth per-frame deltas (the visible ring is frozen); on
     /// release the tracked velocity decays out as a trackpad-style coast.
     /// Natural direction = content follows the hand.
-    private func stepScroll(config: Config, dt: CFTimeInterval, k: CGFloat, active: Bool) {
+    private func stepScroll(config: Config, dt: CFTimeInterval, k: CGFloat, active: Bool,
+                            sandbox: Bool = false) {
         if active {
             let t = scrollNormTarget
             var e = scrollEased ?? t
@@ -675,7 +737,11 @@ final class OverlayView: NSView {
             let g = CGFloat(config.scrollGain) * sign
             let dx = (e.x - old.x) * bounds.width * g
             let dy = (e.y - old.y) * bounds.height * g
-            mouse.scroll(dx: dx, dy: dy)
+            if sandbox {
+                mockWindows.first(where: { $0.scrollable })?.scrollContent(byWheel: dy)
+            } else {
+                mouse.scroll(dx: dx, dy: dy)
+            }
             let f = CGFloat(1.0 / (dt * 60)) // velocity per 60fps frame
             scrollVel.dx = scrollVel.dx * 0.7 + dx * f * 0.3
             scrollVel.dy = scrollVel.dy * 0.7 + dy * f * 0.3
@@ -686,7 +752,12 @@ final class OverlayView: NSView {
                 return
             }
             let frames = CGFloat(dt * 60)
-            mouse.scroll(dx: scrollVel.dx * frames, dy: scrollVel.dy * frames)
+            if sandbox {
+                mockWindows.first(where: { $0.scrollable })?
+                    .scrollContent(byWheel: scrollVel.dy * frames)
+            } else {
+                mouse.scroll(dx: scrollVel.dx * frames, dy: scrollVel.dy * frames)
+            }
             let decay = pow(0.93, frames)
             scrollVel.dx *= decay
             scrollVel.dy *= decay

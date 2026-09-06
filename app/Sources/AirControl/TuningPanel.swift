@@ -136,7 +136,7 @@ struct TuningView: View {
                        help: "How quickly reach recovers after a cross, scaled by hand speed")
             }
             Section("Windows") {
-                Toggle("Practice on mock windows", isOn: $store.config.useMockWindows)
+                Toggle("Practice sandbox (mock windows; nothing real is touched)", isOn: $store.config.useMockWindows)
                     .font(.caption)
                 Toggle("Raise window on grab", isOn: $store.config.raiseOnGrab)
                     .font(.caption)
