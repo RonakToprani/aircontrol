@@ -8,12 +8,21 @@ import QuartzCore
 /// confidently visible in a processed frame.
 final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     var onFrame: ((LandmarkFrame?) -> Void)?
+    /// Fired on the main thread when another app grabs the camera (true) and
+    /// when it hands it back (false) — the menu-bar status reflects it.
+    var onInterruption: ((Bool) -> Void)?
 
     /// Exposed for the hand-preview window's AVCaptureVideoPreviewLayer.
     let session = AVCaptureSession()
     private let queue = DispatchQueue(label: "aircontrol.camera", qos: .userInteractive)
     private let request = VNDetectHumanHandPoseRequest()
     private var configured = false
+
+    // Idle rest: while resting we still receive every camera frame but run
+    // Vision on only every Nth, cutting the app's biggest energy cost when no
+    // one's using it. 1 = full rate. Any detected hand snaps it back to 1.
+    private var frameCounter: UInt64 = 0
+    private var idleSkip = 1
 
     private var lastDetectionTime: CFTimeInterval = 0
     private var fpsEMA: Double = 0
@@ -34,6 +43,39 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     override init() {
         super.init()
         request.maximumHandCount = 1
+
+        // Camera contention: another app can seize the camera out from under
+        // us. Surface it as status and resume cleanly when it's returned;
+        // never a dialog. Runtime errors get one restart attempt.
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(sessionInterrupted),
+                       name: .AVCaptureSessionWasInterrupted, object: session)
+        nc.addObserver(self, selector: #selector(sessionInterruptionEnded),
+                       name: .AVCaptureSessionInterruptionEnded, object: session)
+        nc.addObserver(self, selector: #selector(sessionRuntimeError),
+                       name: .AVCaptureSessionRuntimeError, object: session)
+    }
+
+    @objc private func sessionInterrupted() {
+        DispatchQueue.main.async { self.onInterruption?(true) }
+    }
+
+    @objc private func sessionInterruptionEnded() {
+        DispatchQueue.main.async { self.onInterruption?(false) }
+    }
+
+    @objc private func sessionRuntimeError() {
+        // A transient capture error — give the session one gentle restart.
+        queue.asyncAfter(deadline: .now() + 0.5) {
+            guard self.configured, !self.session.isRunning else { return }
+            self.session.startRunning()
+        }
+    }
+
+    /// Rest mode: run Vision on every 4th frame instead of every one. Called
+    /// from AppState when no hand has been seen for the idle timeout.
+    func setIdle(_ idle: Bool) {
+        queue.async { self.idleSkip = idle ? 4 : 1 }
     }
 
     /// Starts capture, requesting camera permission if needed.
@@ -102,6 +144,11 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
+        // Rest mode: skip the Vision pass on most frames. Cheap and correct —
+        // the moment a processed frame finds a hand, AppState restores 1:1.
+        frameCounter &+= 1
+        if idleSkip > 1, frameCounter % UInt64(idleSkip) != 0 { return }
+
         let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
         do {
             try handler.perform([request])

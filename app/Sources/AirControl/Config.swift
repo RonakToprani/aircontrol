@@ -74,6 +74,7 @@ struct Config: Codable, Equatable {
     // Power
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
     var peaceHoldMS: Double = 1000     // hold the peace sign this long to turn off
+    var idleAfterMin: Double = 3       // no hand for this long → rest (drop detection rate to save battery)
 
     // Spaces (M4 pulled forward)
     var switchSpaces: Bool = true      // fired swipe posts ⌃←/⌃→ (needs Accessibility)
@@ -135,6 +136,7 @@ struct Config: Codable, Equatable {
         thumbsUpHoldMS = (try? c.decode(Double.self, forKey: .thumbsUpHoldMS)) ?? d.thumbsUpHoldMS
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
+        idleAfterMin = (try? c.decode(Double.self, forKey: .idleAfterMin)) ?? d.idleAfterMin
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
         thumbSwitch = (try? c.decode(Bool.self, forKey: .thumbSwitch)) ?? d.thumbSwitch
         thumbHoldMS = (try? c.decode(Double.self, forKey: .thumbHoldMS)) ?? d.thumbHoldMS
