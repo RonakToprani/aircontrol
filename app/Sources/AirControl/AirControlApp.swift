@@ -15,15 +15,16 @@ struct AirControlApp: App {
             Divider()
             Toggle("Mouse mode — pinch to click", isOn: $config.config.mouseMode)
             Divider()
+            Button("Welcome Tour…") { state.showOnboarding() }
             Button("Calibrate hand range…") { state.startCalibration() }
                 .disabled(!state.enabled)
-            Button("Reset calibration") { state.resetCalibration() }
             Divider()
             Toggle("Show hand preview", isOn: $state.showPreview)
                 .disabled(!state.enabled)
-            Toggle("Show tuning panel", isOn: $state.showTuning)
+            Toggle("Advanced Tuning…", isOn: $state.showTuning)
                 .disabled(!state.enabled)
             Divider()
+            Button("Check for Updates…") { UpdateChecker.check() }
             Button("Quit AirControl") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
