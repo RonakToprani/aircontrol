@@ -119,7 +119,11 @@ final class OnboardingModel: ObservableObject {
                 // 🤙 drill: the shaka's observable effect IS the mode flip.
                 if config.mouseMode != self.mouseModeOn {
                     self.mouseModeOn = config.mouseMode
-                    if self.step == .practice, self.currentDrill == .shaka {
+                    // Only the ON flip counts: completing on an OFF flip would
+                    // check the drill while stranding the scroll drill, which
+                    // needs mouse mode to be on.
+                    if self.step == .practice, self.currentDrill == .shaka,
+                       config.mouseMode {
                         self.complete(.shaka)
                     }
                 }
@@ -133,7 +137,11 @@ final class OnboardingModel: ObservableObject {
         NotificationCenter.default.publisher(for: .aircontrolMockWindowDragged)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                guard let self, self.step == .practice, self.currentDrill == .grab else { return }
+                // Not gated on currentDrill: a drag performed in the moment
+                // before the checklist advances to the grab row still counts
+                // (the once-per-grab latch in the overlay would otherwise
+                // swallow it, forcing a whole new grab).
+                guard let self, self.step == .practice else { return }
                 self.complete(.grab)
             }
             .store(in: &cancellables)
@@ -164,28 +172,24 @@ final class OnboardingModel: ObservableObject {
 
     // MARK: practice sandbox
 
-    private var practiceSaved: (mocks: Bool, spaces: Bool)?
-
     private func enterPracticeEnvironment() {
-        guard practiceSaved == nil else { return }
-        var c = app.configStore.config
-        practiceSaved = (c.useMockWindows, c.switchSpaces)
-        c.useMockWindows = true
-        c.switchSpaces = false
-        app.configStore.config = c
+        guard !app.practiceSandbox else { return }
+        // A runtime overlay (AppState.effectiveConfig), never a config write:
+        // nothing to restore, nothing that can leak to disk if the app dies
+        // mid-practice, and the Tuning panel keeps showing real settings.
+        app.practiceSandbox = true
+        // Drills assume the session-start state (gesture mode): the 🤙 drill
+        // must flip mouse mode ON, and the scroll drill builds on that.
+        app.configStore.config.mouseMode = false
     }
 
     private func exitPracticeEnvironment() {
-        guard let saved = practiceSaved else { return }
-        practiceSaved = nil
-        var c = app.configStore.config
-        c.useMockWindows = saved.mocks
-        c.switchSpaces = saved.spaces
+        guard app.practiceSandbox else { return }
+        app.practiceSandbox = false
         // The shaka drill turned mouse mode on; the tour hands the user back
         // the same state every session starts in — mouse mode is ALWAYS a
         // deliberate, manual choice (Ronak's rule), never an ambient leftover.
-        c.mouseMode = false
-        app.configStore.config = c
+        app.configStore.config.mouseMode = false
     }
 
     // MARK: actions
@@ -268,7 +272,12 @@ final class OnboardingModel: ObservableObject {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self else { return }
-            if let n = Drill(rawValue: drill.rawValue + 1) { self.currentDrill = n }
+            // First incomplete drill in teaching order — not blindly the next
+            // raw value, since the grab can check off early (its notification
+            // isn't gated on being the current row).
+            if let n = Drill.allCases.first(where: { !self.completed.contains($0) }) {
+                self.currentDrill = n
+            }
         }
     }
 }

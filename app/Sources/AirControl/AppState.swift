@@ -32,6 +32,29 @@ final class AppState: ObservableObject {
 
     let configStore = ConfigStore()
 
+    /// True while the welcome tour's practice step is open. The sandbox is a
+    /// runtime OVERLAY on the stored config (see `effectiveConfig`), never a
+    /// write to it — so a crash or force-quit mid-practice can't leak sandbox
+    /// settings into UserDefaults, and the Tuning panel keeps showing the
+    /// user's real values throughout.
+    @Published var practiceSandbox = false
+
+    /// The config the engine and overlay actually run on: the stored config,
+    /// with the practice sandbox forced on top while the tour is practicing —
+    /// mock windows on, Space switching off, and the taught gestures (🤙,
+    /// thumb pose) enabled so every drill is performable even if the user
+    /// disabled them in tuning.
+    var effectiveConfig: Config {
+        var c = configStore.config
+        if practiceSandbox {
+            c.useMockWindows = true
+            c.switchSpaces = false
+            c.shakaToggle = true
+            c.thumbSwitch = true
+        }
+        return c
+    }
+
     private let tracker = HandTracker()
     private let engine = GestureEngine()
     private let mover = WindowMover()
@@ -186,7 +209,9 @@ final class AppState: ObservableObject {
     private func rebuildOverlay() {
         overlay?.close()
         let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
-                                        configProvider: { [configStore] in configStore.config },
+                                        configProvider: { [unowned self] in
+                                            MainActor.assumeIsolated { self.effectiveConfig }
+                                        },
                                         mover: mover)
         self.overlay = overlay
         overlay.show()
@@ -219,7 +244,7 @@ final class AppState: ObservableObject {
         tracker.onFrame = { [weak self] frame in
             DispatchQueue.main.async {
                 guard let self, self.enabled else { return }
-                let state = self.engine.process(frame, config: self.configStore.config,
+                let state = self.engine.process(frame, config: self.effectiveConfig,
                                                 now: CACurrentMediaTime())
                 // Toggle BEFORE the overlay sees the event, so its MOUSE
                 // ON/OFF flash reads the mode it just switched into.
@@ -250,7 +275,7 @@ final class AppState: ObservableObject {
                     return
                 }
                 if let event = state.swipeEvent, self.calStage == .idle,
-                   self.configStore.config.switchSpaces {
+                   self.effectiveConfig.switchSpaces {
                     self.accessibilityOK = SpaceSwitcher.isTrusted
                     let dir = self.configStore.config.swipeNatural ? -event : event
                     SpaceSwitcher.post(direction: dir, warpTo: self.overlay?.pointerCG())

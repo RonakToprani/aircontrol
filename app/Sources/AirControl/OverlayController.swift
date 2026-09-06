@@ -157,8 +157,12 @@ private final class MockWindowLayer: CALayer {
         clip.cornerRadius = 9
         let content = CALayer()
         content.frame = clip.bounds
-        let rows = Int(clip.bounds.height / stripePitch) + 3
-        for i in -1..<rows {
+        // The wrap period is the PATTERN period — three rows of varying
+        // length (see scrollContent) — so rows must overhang the clip by a
+        // full period on both sides for the wrap snap to land on an
+        // identical-looking frame.
+        let rows = Int(clip.bounds.height / stripePitch) + 4
+        for i in -4..<rows {
             let row = CALayer()
             let trim = CGFloat(((i % 3) + 3) % 3) * 44 // varied lengths read as text
             row.frame = CGRect(x: 16, y: CGFloat(i) * stripePitch + 8,
@@ -173,10 +177,13 @@ private final class MockWindowLayer: CALayer {
         stripesBaseY = content.position.y
     }
 
-    /// wheel-pixel delta in, wrapped row motion out.
+    /// wheel-pixel delta in, wrapped row motion out. Wraps on the pattern
+    /// period (three rows — the trim cycle in addScrollContent), not a single
+    /// row pitch: wrapping every 34px put differently-trimmed rows where
+    /// their neighbors just were, visibly teleporting row lengths.
     func scrollContent(byWheel dy: CGFloat) {
         guard let content = stripes else { return }
-        scrollPhase = (scrollPhase + dy).truncatingRemainder(dividingBy: stripePitch)
+        scrollPhase = (scrollPhase + dy).truncatingRemainder(dividingBy: stripePitch * 3)
         content.position.y = stripesBaseY - scrollPhase
     }
 
@@ -227,6 +234,7 @@ final class OverlayView: NSView {
     private var scrollNormTarget: CGPoint = .zero
     private var scrollEased: CGPoint?
     private var scrollVel = CGVector.zero
+    private var lastScrollSandbox = false
 
     // Dictation (mouse mode): pinch-hold still on a text field turns the
     // pinch into a push-to-talk button.
@@ -416,7 +424,10 @@ final class OverlayView: NSView {
         seamPressure = m.pressure
         seamDX = m.pressureDX
         seamDY = m.pressureDY
-        if let event = s.swipeEvent {
+        // Only flash "Space ⟶" when a switch can actually happen — with
+        // switching suppressed (practice sandbox, or the tuning toggle off)
+        // the banner would announce a switch that never occurs.
+        if let event = s.swipeEvent, configProvider().switchSpaces {
             swipeFlashTime = CACurrentMediaTime()
             swipeFlash.foregroundColor = NSColor.systemGreen.cgColor
             let dir = configProvider().swipeNatural ? -event : event
@@ -429,7 +440,9 @@ final class OverlayView: NSView {
         }
         // 👍 fired (once per engine frame — handled here, not in step, so a
         // render frame can never see it twice and double-press Return).
-        if s.sendEvent {
+        // Never in the practice sandbox: a REAL Return keypress would leak
+        // out of "nothing real is touched" into whatever field has focus.
+        if s.sendEvent, !configProvider().useMockWindows {
             mouse.pressReturnIfTextHasContent()
             swipeFlashTime = CACurrentMediaTime()
             swipeFlash.foregroundColor = NSColor.systemGreen.cgColor
@@ -488,7 +501,7 @@ final class OverlayView: NSView {
             mouse.releaseIfNeeded()
             if dictating { abortDictation() }
             stepScroll(config: config, dt: dt, k: k,
-                       active: scrollHold && !state.settling, sandbox: true)
+                       active: scrollHold && !state.settling)
         } else if config.mouseMode {
             mouse.dragSlopPx = CGFloat(config.mouseDragSlopPx)
             mouse.downDelay = config.mouseDownDelayMS / 1000
@@ -541,7 +554,7 @@ final class OverlayView: NSView {
         // --- Grab / drag (knuckle-driven, so the pinch curl doesn't lurch it).
         // The practice windows work in BOTH modes — during the tour a pinch
         // always grabs something safe, never a real window.
-        let mocksOn = config.useMockWindows
+        let mocksOn = sandbox
         mockHost.isHidden = !mocksOn
         let hoverActive: Bool
 
@@ -724,8 +737,18 @@ final class OverlayView: NSView {
     /// supplies smooth per-frame deltas (the visible ring is frozen); on
     /// release the tracked velocity decays out as a trackpad-style coast.
     /// Natural direction = content follows the hand.
-    private func stepScroll(config: Config, dt: CFTimeInterval, k: CGFloat, active: Bool,
-                            sandbox: Bool = false) {
+    private func stepScroll(config: Config, dt: CFTimeInterval, k: CGFloat, active: Bool) {
+        // Derived from the config both call sites already pass — a parameter
+        // could silently desync from the mode it must mirror.
+        let sandbox = config.useMockWindows
+        if sandbox != lastScrollSandbox {
+            lastScrollSandbox = sandbox
+            // Momentum must not cross worlds: velocity built coasting the
+            // practice pane would otherwise land on real content (and vice
+            // versa) the frame the sandbox toggles.
+            scrollVel = .zero
+            scrollEased = nil
+        }
         if active {
             let t = scrollNormTarget
             var e = scrollEased ?? t
