@@ -20,6 +20,8 @@ final class AppState: ObservableObject {
     @Published private(set) var stats = GestureState()
     @Published private(set) var handVisible = false
     @Published private(set) var cameraError: String?
+    @Published private(set) var cameraInterrupted = false
+    @Published private(set) var resting = false
     @Published private(set) var accessibilityOK = true
     @Published private(set) var axLatencyMS: Double = 0
 
@@ -39,6 +41,9 @@ final class AppState: ObservableObject {
     private var onboarding: OnboardingController?
     private var lastUIUpdate: CFTimeInterval = 0
     private var lastAXCheck: CFTimeInterval = 0
+    private var lastHandTime: CFTimeInterval = 0
+    private var suspendedForSleep = false
+    private var screenChangeWork: DispatchWorkItem?
 
     // Pinch-corner calibration flow (PLAN §5.4).
     private enum CalStage { case idle, waitTopLeft, waitBottomRight }
@@ -63,6 +68,28 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
         mover.onLatency = { [weak self] ms in self?.axLatencyMS = ms }
+
+        // Camera contention: reflect it in the status line; frames simply
+        // stop while interrupted, so the display link releases any held
+        // mouse button on its own within a few frames.
+        tracker.onInterruption = { [weak self] interrupted in
+            guard let self else { return }
+            self.cameraInterrupted = interrupted
+            if !interrupted { self.lastHandTime = CACurrentMediaTime() } // don't insta-rest on return
+        }
+
+        // Sleep/wake: stop the camera on sleep so it isn't held across a lid
+        // close, and bring it back shortly after wake — WITHOUT touching the
+        // user's enabled state, so the menu still reads "on" throughout.
+        let ws = NSWorkspace.shared.notificationCenter
+        ws.addObserver(self, selector: #selector(handleSleep), name: NSWorkspace.willSleepNotification, object: nil)
+        ws.addObserver(self, selector: #selector(handleWake), name: NSWorkspace.didWakeNotification, object: nil)
+
+        // Display hot-plug: rebuild the overlay for the new screen set. The
+        // notification fires in bursts as displays settle, so debounce.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleScreenChange),
+            name: NSApplication.didChangeScreenParametersNotification, object: nil)
 
         // Mouse mode posts CGEvents — same Accessibility trust as Space
         // switching. Prompt the moment it's flipped on, not at next launch.
@@ -97,15 +124,76 @@ final class AppState: ObservableObject {
     var statusLine: String {
         if let error = cameraError { return "⚠︎ \(error)" }
         if !enabled { return "Off" }
+        if cameraInterrupted { return "Camera in use by another app" }
+        if resting { return "Resting — show your hand to wake" }
         if !handVisible { return "On — no hand detected" }
         return String(format: "Tracking · %.0f detections/sec", stats.fps)
     }
 
     private func start() {
         cameraError = nil
+        suspendedForSleep = false
         if configStore.config.switchSpaces || configStore.config.mouseMode {
             accessibilityOK = SpaceSwitcher.requestTrust()
         }
+        launchSession()
+    }
+
+    // MARK: - Lifecycle events
+
+    @objc private func handleSleep() {
+        guard enabled, !suspendedForSleep else { return }
+        suspendedForSleep = true
+        teardownSession() // releases any held mouse button + hidden cursor
+    }
+
+    @objc private func handleWake() {
+        guard enabled, suspendedForSleep else { return }
+        suspendedForSleep = false
+        // Give the camera a moment to come back with the system.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, self.enabled, !self.suspendedForSleep else { return }
+            self.launchSession()
+        }
+    }
+
+    @objc private func handleScreenChange() {
+        guard enabled, !suspendedForSleep else { return }
+        screenChangeWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.enabled else { return }
+            // Drop any in-flight window drag where it stands, then rebuild the
+            // overlay windows onto the new screen arrangement.
+            self.mover.endDrag(at: nil)
+            self.overlay?.close()
+            let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
+                                            configProvider: { [configStore = self.configStore] in configStore.config },
+                                            mover: self.mover)
+            self.overlay = overlay
+            overlay.show()
+        }
+        screenChangeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
+    }
+
+    /// Stops the camera and tears down the overlay without changing `enabled`
+    /// — the shared path for sleep and for a full stop.
+    private func teardownSession() {
+        tracker.stop()
+        tracker.setIdle(false)
+        resting = false
+        overlay?.close()
+        overlay = nil
+        handVisible = false
+        stats = GestureState()
+        updatePreview()
+        updateTuning()
+    }
+
+    /// Builds the overlay, wires the frame pipeline, and starts the camera.
+    /// Reused by first enable and by wake-from-sleep.
+    private func launchSession() {
+        lastHandTime = CACurrentMediaTime()
         let overlay = OverlayController(screen: NSScreen.main ?? NSScreen.screens[0],
                                         configProvider: { [configStore] in configStore.config },
                                         mover: mover)
@@ -160,6 +248,18 @@ final class AppState: ObservableObject {
                     let trusted = SpaceSwitcher.isTrusted
                     if trusted != self.accessibilityOK { self.accessibilityOK = trusted }
                 }
+
+                // Battery rest: a visible hand keeps us awake and instantly
+                // ends any rest; a long absence drops to the low frame rate.
+                if state.handVisible {
+                    self.lastHandTime = now
+                    if self.resting { self.resting = false; self.tracker.setIdle(false) }
+                } else if !self.resting,
+                          now - self.lastHandTime > self.configStore.config.idleAfterMin * 60 {
+                    self.resting = true
+                    self.tracker.setIdle(true)
+                }
+
                 if now - self.lastUIUpdate > 0.1
                     || state.pinching != self.stats.pinching
                     || state.swipeEvent != nil {
@@ -288,14 +388,11 @@ final class AppState: ObservableObject {
 
     private func stop() {
         calStage = .idle
-        tracker.stop()
+        suspendedForSleep = false
+        cameraInterrupted = false
+        screenChangeWork?.cancel()
         tracker.onFrame = nil
-        overlay?.close()
-        overlay = nil
-        handVisible = false
-        stats = GestureState()
-        updatePreview()
-        updateTuning()
+        teardownSession()
     }
 
     /// The preview panel exists only while enabled AND requested — the camera
