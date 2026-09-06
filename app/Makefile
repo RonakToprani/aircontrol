@@ -29,7 +29,9 @@ dist:
 	ln -s /Applications dist/stage/Applications
 	hdiutil create -volname "AirControl $(VERSION)" -srcfolder dist/stage \
 		-ov -format UDZO "dist/AirControl-$(VERSION).dmg"
+	cd dist && shasum -a 256 "AirControl-$(VERSION).dmg" > checksums.txt
 	@echo "==> dist/AirControl-$(VERSION).dmg"
+	@cat dist/checksums.txt
 
 run: bundle
 	open $(BUNDLE)
