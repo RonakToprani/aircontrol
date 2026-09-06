@@ -52,13 +52,24 @@ final class OnboardingModel: ObservableObject {
         case welcome, camera, accessibility, calibrate, practice, done
     }
 
-    /// The practice drills, in teaching order. The ✌ off-switch is explained
-    /// on a card, never practiced — it would turn the app off mid-tour.
+    /// The practice drills, in teaching order — every one must actually be
+    /// PERFORMED to check off; Continue stays locked until all five are done.
+    /// The ✌ off-switch is explained on a card, never practiced — it would
+    /// turn the app off mid-tour.
     enum Drill: Int, CaseIterable {
-        case move, pinch, shaka, scroll
+        case move, grab, thumb, shaka, scroll
     }
 
-    @Published var step: Step = .welcome
+    @Published var step: Step = .welcome {
+        didSet {
+            // Practice runs in a safe sandbox: two practice windows appear
+            // (so a pinch can't grab your real windows), and Space switching
+            // is suppressed (so the thumb drill can't yank you off this
+            // desktop). Restored the moment practice ends, however it ends.
+            if step == .practice { enterPracticeEnvironment() }
+            else if oldValue == .practice { exitPracticeEnvironment() }
+        }
+    }
     @Published var cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
     @Published var handSeen = false
     @Published var axTrusted = SpaceSwitcher.isTrusted
@@ -76,7 +87,6 @@ final class OnboardingModel: ObservableObject {
     private var advancing = false
     private var lastPointer: CGPoint?
     private var travel: CGFloat = 0
-    private var sawPinch = false
 
     init() {
         calibrated = app.configStore.config.calibration != nil
@@ -120,6 +130,14 @@ final class OnboardingModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: .aircontrolMockWindowDragged)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.step == .practice, self.currentDrill == .grab else { return }
+                self.complete(.grab)
+            }
+            .store(in: &cancellables)
+
         // Permission states change outside our process — poll gently while
         // the tour is open (the only place the app ever polls anything).
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -138,9 +156,36 @@ final class OnboardingModel: ObservableObject {
     }
 
     func teardown() {
+        exitPracticeEnvironment() // closing mid-practice must not leak the sandbox
         pollTimer?.invalidate()
         pollTimer = nil
         cancellables.removeAll()
+    }
+
+    // MARK: practice sandbox
+
+    private var practiceSaved: (mocks: Bool, spaces: Bool)?
+
+    private func enterPracticeEnvironment() {
+        guard practiceSaved == nil else { return }
+        var c = app.configStore.config
+        practiceSaved = (c.useMockWindows, c.switchSpaces)
+        c.useMockWindows = true
+        c.switchSpaces = false
+        app.configStore.config = c
+    }
+
+    private func exitPracticeEnvironment() {
+        guard let saved = practiceSaved else { return }
+        practiceSaved = nil
+        var c = app.configStore.config
+        c.useMockWindows = saved.mocks
+        c.switchSpaces = saved.spaces
+        // The shaka drill turned mouse mode on; the tour hands the user back
+        // the same state every session starts in — mouse mode is ALWAYS a
+        // deliberate, manual choice (Ronak's rule), never an ambient leftover.
+        c.mouseMode = false
+        app.configStore.config = c
     }
 
     // MARK: actions
@@ -201,8 +246,12 @@ final class OnboardingModel: ObservableObject {
                 lastPointer = stats.pointer
                 if travel > 0.9 { complete(.move) }
             }
-        case .pinch:
-            if stats.pinching { sawPinch = true } else if sawPinch { complete(.pinch) }
+        case .grab:
+            break // completes on the mock-window drag notification
+        case .thumb:
+            // The pose fires its event even with Space switching suppressed —
+            // the user performs the REAL gesture, the desktop just stays put.
+            if stats.swipeEvent != nil { complete(.thumb) }
         case .shaka:
             break // detected on the config flip, not on stats
         case .scroll:
@@ -213,6 +262,10 @@ final class OnboardingModel: ObservableObject {
     private func complete(_ drill: Drill) {
         guard !completed.contains(drill) else { return }
         completed.insert(drill)
+        if completed.count == Drill.allCases.count {
+            advance(after: 1.2) // all five done — roll on to the cheat sheet
+            return
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self else { return }
             if let n = Drill(rawValue: drill.rawValue + 1) { self.currentDrill = n }
@@ -336,15 +389,19 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Try it")
                 .font(.system(size: 24, weight: .bold))
-            Text(model.enabled ? "Each gesture checks itself off when it works."
-                               : "Turn AirControl on from the menu bar to practice.")
+            Text(model.enabled
+                 ? "Two practice windows just appeared on your desktop — they're safe to play with and vanish when you're done. Each move checks itself off when you actually do it."
+                 : "Turn AirControl on from the menu bar to practice.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 8) {
                 drillRow(.move, symbol: "hand.raised", title: "Move the cursor",
                          hint: "Open hand, move it around")
-                drillRow(.pinch, symbol: "hand.pinch", title: "Pinch",
-                         hint: "Touch thumb and index tip, then release")
+                drillRow(.grab, symbol: "macwindow", title: "Grab a practice window",
+                         hint: "Pinch on a practice window, drag it somewhere new, let go")
+                drillRow(.thumb, symbol: "hand.point.left", title: "Point your thumb between desktops",
+                         hint: "Fist, thumb out sideways, hold — practicing here won't switch anything")
                 drillRow(.shaka, symbol: "hand.wave", title: "Shaka 🤙 for mouse mode",
                          hint: "Thumb + little finger out, hold until the meter fills")
                 drillRow(.scroll, symbol: "scroll", title: "Fist to scroll",
@@ -476,6 +533,13 @@ struct OnboardingView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.teal)
                     .keyboardShortcut(.defaultAction)
+            case .practice:
+                // Doing beats reading: Continue unlocks only when all five
+                // drills were actually performed. "Skip demo" stays as the out.
+                Button("Continue") { model.next() }
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(model.completed.count < OnboardingModel.Drill.allCases.count)
             default:
                 Button("Continue") { model.next() }
                     .controlSize(.large)

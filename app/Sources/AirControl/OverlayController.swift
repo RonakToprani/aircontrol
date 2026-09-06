@@ -90,6 +90,12 @@ final class OverlayController {
     func setPrompt(_ text: String?) { view.prompt = text }
 }
 
+extension Notification.Name {
+    /// A practice (mock) window was pinch-dragged a real distance — the
+    /// welcome tour's grab drill completes on this.
+    static let aircontrolMockWindowDragged = Notification.Name("aircontrol.mockWindowDragged")
+}
+
 // MARK: -
 
 private final class MockWindowLayer: CALayer {
@@ -191,6 +197,8 @@ final class OverlayView: NSView {
     // Drag state (mock windows).
     private var grabbed: MockWindowLayer?
     private var grabOffset: CGPoint = .zero
+    private var grabStartCenter: CGPoint?
+    private var mockDragNotified = false
     private var wasPinching = false
 
     // Drag state (real windows, M3). Frames in CG coords (top-left origin).
@@ -231,6 +239,9 @@ final class OverlayView: NSView {
         self.mover = mover
         super.init(frame: frame)
         wantsLayer = true
+        // Hidden from birth unless practice windows are enabled — waiting for
+        // the first render tick to hide them flashes them at every launch.
+        mockHost.isHidden = !configProvider().useMockWindows
 
         glow.borderColor = NSColor.systemTeal.withAlphaComponent(0.18).cgColor
         glow.borderWidth = 3
@@ -494,6 +505,8 @@ final class OverlayView: NSView {
             if state.pinching, !wasPinching, handFresh, let p = pointer, let a = anchor {
                 if let win = mockWindows.last(where: { $0.containsInSuperlayer(p) }) {
                     grabbed = win
+                    grabStartCenter = win.center
+                    mockDragNotified = false
                     grabOffset = CGPoint(x: win.center.x - a.x, y: win.center.y - a.y)
                     mockWindows.removeAll { $0 === win } // move to top
                     mockWindows.append(win)
@@ -504,6 +517,13 @@ final class OverlayView: NSView {
 
             if let win = grabbed, let a = anchor {
                 win.target = CGPoint(x: a.x + grabOffset.x, y: a.y + grabOffset.y)
+                // The welcome tour's grab drill listens for a real drag —
+                // fired once per grab, only after honest travel.
+                if !mockDragNotified, let s = grabStartCenter,
+                   hypot(win.target.x - s.x, win.target.y - s.y) > 60 {
+                    mockDragNotified = true
+                    NotificationCenter.default.post(name: .aircontrolMockWindowDragged, object: nil)
+                }
             }
             for win in mockWindows {
                 var c = win.center
