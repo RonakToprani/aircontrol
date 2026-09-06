@@ -24,6 +24,9 @@ struct AirControlApp: App {
             Toggle("Advanced Tuning…", isOn: $state.showTuning)
                 .disabled(!state.enabled)
             Divider()
+            Toggle("Start at Login", isOn: Binding(
+                get: { LoginItem.enabled },
+                set: { LoginItem.enabled = $0 }))
             Button("Check for Updates…") { UpdateChecker.check() }
             Button("Quit AirControl") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")

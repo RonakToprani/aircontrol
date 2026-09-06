@@ -179,6 +179,8 @@ struct TuningView: View {
                     .font(.caption)
                 slider("Peace hold time (ms)", $store.config.peaceHoldMS, 400...2000, "%.0f",
                        help: "Index+middle up, ring+little folded; hold until the red meter fills")
+                slider("Rest after (min)", $store.config.idleAfterMin, 1...15, "%.0f",
+                       help: "With no hand seen this long, detection drops to a low rate to save battery; showing your hand wakes it instantly")
             }
             Section("Live readouts") {
                 readout("Detect FPS", String(format: "%.0f", app.stats.fps))
