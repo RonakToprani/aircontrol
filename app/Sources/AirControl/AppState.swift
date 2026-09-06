@@ -36,6 +36,7 @@ final class AppState: ObservableObject {
     private var overlay: OverlayController?
     private var preview: PreviewController?
     private var tuning: TuningPanelController?
+    private var onboarding: OnboardingController?
     private var lastUIUpdate: CFTimeInterval = 0
     private var lastAXCheck: CFTimeInterval = 0
 
@@ -73,6 +74,12 @@ final class AppState: ObservableObject {
                 self.accessibilityOK = SpaceSwitcher.requestTrust()
             }
             .store(in: &cancellables)
+
+        // First launch: open the welcome tour before the user has to go
+        // hunting for a menu-bar icon they don't know exists yet.
+        if !UserDefaults.standard.bool(forKey: "aircontrol.onboarded") {
+            DispatchQueue.main.async { [weak self] in self?.showOnboarding() }
+        }
 
         // The engine's pointer-freeze is keyed to macOS actually switching
         // Spaces — never to the swipe gesture, which may switch nothing.
@@ -174,6 +181,19 @@ final class AppState: ObservableObject {
                 }
             }
         }
+    }
+
+    /// The welcome tour — auto-shown on first launch, reopenable from the
+    /// menu. One instance at a time; re-invoking brings it to front.
+    func showOnboarding() {
+        if let o = onboarding {
+            o.show()
+            return
+        }
+        let o = OnboardingController()
+        o.onClose = { [weak self] in self?.onboarding = nil }
+        onboarding = o
+        o.show()
     }
 
     func startCalibration() {
