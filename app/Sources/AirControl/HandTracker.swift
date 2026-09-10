@@ -26,6 +26,11 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     // one's using it. 1 = full rate. Any detected hand snaps it back to 1.
     private var frameCounter: UInt64 = 0
     private var idleSkip = 1
+    // Lightweight mode reuses the same skip pattern at every 2nd frame — a
+    // 30fps camera lands at ~15 Hz detection, plenty for hand landmarks. The
+    // deeper idle skip still wins while resting (max of the two).
+    private var lightweight = false
+    private let lightweightSkip = 2
 
     private var lastDetectionTime: CFTimeInterval = 0
     private var fpsEMA: Double = 0
@@ -84,6 +89,22 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         queue.async { self.idleSkip = idle ? 4 : 1 }
     }
 
+    /// Lightweight mode: 640×480 capture + half-rate detection. Vision's hand
+    /// network downsamples its input anyway, so the 720p decode/scale it
+    /// replaces was pure cost — the two together are the bulk of the app's
+    /// CPU on older Macs. Live-switchable; the session reconfigures in place.
+    func setLightweight(_ on: Bool) {
+        queue.async {
+            guard on != self.lightweight else { return }
+            self.lightweight = on
+            if self.configured {
+                self.session.beginConfiguration()
+                self.applyPreset()
+                self.session.commitConfiguration()
+            }
+        }
+    }
+
     /// Starts capture, requesting camera permission if needed.
     /// `onStatus` is called with nil on success or a user-facing error string.
     func start(onStatus: @escaping (String?) -> Void) {
@@ -118,7 +139,7 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     private func configureAndRun(onStatus: @escaping (String?) -> Void) {
         if !configured {
             session.beginConfiguration()
-            session.sessionPreset = session.canSetSessionPreset(.hd1280x720) ? .hd1280x720 : .high
+            applyPreset()
 
             guard let device = AVCaptureDevice.default(for: .video),
                   let input = try? AVCaptureDeviceInput(device: device),
@@ -147,15 +168,28 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         onStatus(nil)
     }
 
+    /// Must run between beginConfiguration/commitConfiguration on the camera
+    /// queue. Landmarks don't need 1080p — 640×480 keeps them accurate while
+    /// slashing capture + Vision-preprocessing cost on older hardware.
+    private func applyPreset() {
+        if lightweight, session.canSetSessionPreset(.vga640x480) {
+            session.sessionPreset = .vga640x480
+        } else {
+            session.sessionPreset = session.canSetSessionPreset(.hd1280x720) ? .hd1280x720 : .high
+        }
+    }
+
     // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
 
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-        // Rest mode: skip the Vision pass on most frames. Cheap and correct —
-        // the moment a processed frame finds a hand, AppState restores 1:1.
+        // Rest mode / lightweight: skip the Vision pass on most frames. Cheap
+        // and correct — hold gestures time by wall clock, and the moment a
+        // processed frame finds a hand, AppState restores rest to full rate.
         frameCounter &+= 1
-        if idleSkip > 1, frameCounter % UInt64(idleSkip) != 0 { return }
+        let skip = max(idleSkip, lightweight ? lightweightSkip : 1)
+        if skip > 1, frameCounter % UInt64(skip) != 0 { return }
 
         let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
         do {

@@ -91,6 +91,15 @@ final class AppState: ObservableObject {
                 self?.mover.setMinWriteInterval(ms: c.axWriteMinIntervalMS)
             }
             .store(in: &cancellables)
+
+        // Lightweight mode lives in the tracker (preset + detection rate);
+        // this sink also delivers the initial value, so the first
+        // configureAndRun already builds the session at the right preset.
+        configStore.$config
+            .map(\.lightweight)
+            .removeDuplicates()
+            .sink { [weak self] on in self?.tracker.setLightweight(on) }
+            .store(in: &cancellables)
         mover.onLatency = { [weak self] ms in self?.axLatencyMS = ms }
 
         // Camera contention: reflect it in the status line; frames simply

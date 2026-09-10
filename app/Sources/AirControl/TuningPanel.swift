@@ -189,6 +189,10 @@ struct TuningView: View {
                        help: "Index+middle up, ring+little folded; hold until the red meter fills")
                 slider("Rest after (min)", $store.config.idleAfterMin, 1...15, "%.0f",
                        help: "With no hand seen this long, detection drops to a low rate to save battery; showing your hand wakes it instantly")
+                Toggle("Lightweight mode (for older Macs)", isOn: $store.config.lightweight)
+                    .font(.caption)
+                Text("640×480 camera, ~15 detections/sec, HUD capped at 60fps. Gestures feel the same — hold timers run on the clock, not the frame count. On by default on Intel Macs.")
+                    .font(.caption2).foregroundStyle(.tertiary)
             }
             Section("Live readouts") {
                 readout("Detect FPS", String(format: "%.0f", app.stats.fps))

@@ -291,7 +291,11 @@ final class OverlayView: NSView {
     private let seamBarFill = CALayer()
     private let glow = CALayer()
     private let statusLabel = CATextLayer()
+    private var lastStatusText = ""
     private var link: CADisplayLink?
+    // Tracks the frame-rate range last applied to the link, so a default-off
+    // launch never touches it at all — identical to pre-lightweight behavior.
+    private var linkLightweight = false
 
     private let ringRadius: CGFloat = 18
 
@@ -482,13 +486,31 @@ final class OverlayView: NSView {
             lastHoverQuery = -1e9
         }
 
+        // Lightweight: cap this full layer pass at ≤60fps — a ProMotion
+        // display otherwise runs it at 120Hz for no visible gain. min 30 lets
+        // the system drop further under load. Easing below is already
+        // dt-scaled, so motion feel survives any rate the link settles on.
+        if config.lightweight != linkLightweight {
+            linkLightweight = config.lightweight
+            link.preferredFrameRateRange = config.lightweight
+                ? CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+                : .default
+        }
+
         // Hide the HUD while a Space switch animates — anything drawn during
         // the slide reads as chop. Keyed to the real activeSpaceDidChange
         // notification, not the swipe gesture. Quick ease out, gentler ease in.
         let switching = (now - spaceChangeTime) < config.postSwipeSettleMS / 1000
         if let w = window {
             let target: CGFloat = switching ? 0 : 1
-            w.alphaValue += (target - w.alphaValue) * (switching ? 0.35 : 0.15)
+            let a = w.alphaValue
+            if abs(target - a) > 0.001 {
+                w.alphaValue = a + (target - a) * (switching ? 0.35 : 0.15)
+            } else if a != target {
+                // Snap the last sliver, then stop: alphaValue writes reach the
+                // window server, and steady state was re-writing 1.0 forever.
+                w.alphaValue = target
+            }
         }
 
         // Frame-rate-independent easing (posAlpha defined per 60fps frame).
@@ -930,14 +952,17 @@ final class OverlayView: NSView {
             swipeBarBack.opacity = 0
         }
 
-        // --- Swipe flash fade.
-        swipeFlash.opacity = Float(max(0, 1 - (now - swipeFlashTime) / 0.8))
+        // --- Swipe flash fade. Skip the no-op write once faded: CALayer
+        // setters don't compare, so re-assigning 0 forever kept dirtying it.
+        let flashOpacity = Float(max(0, 1 - (now - swipeFlashTime) / 0.8))
+        if swipeFlash.opacity != flashOpacity { swipeFlash.opacity = flashOpacity }
 
         // --- Status line.
+        let text: String
         if let prompt {
-            statusLabel.string = prompt
+            text = prompt
         } else if let dictation = dictationDisplay {
-            statusLabel.string = dictation
+            text = dictation
         } else if state.fps > 0 {
             let gesture = state.peaceProgress > 0.02 ? "✌ hold to turn off…"
                 : state.shakaProgress > 0.02 ? "🤙 hold to toggle mouse…"
@@ -948,10 +973,17 @@ final class OverlayView: NSView {
                 : state.swiping ? (state.swipeArmed ? "PALM ✓ armed" : "PALM open")
                 : "point"
             let mode = configProvider().mouseMode ? " · MOUSE" : ""
-            statusLabel.string = String(format: "AirControl M3%@ · %.0f fps · %@%@",
-                                        mode, state.fps, gesture, handFresh ? "" : " · no hand")
+            text = String(format: "AirControl M3%@ · %.0f fps · %@%@",
+                          mode, state.fps, gesture, handFresh ? "" : " · no hand")
         } else {
-            statusLabel.string = "AirControl M3 · show your hand to the camera"
+            text = "AirControl M3 · show your hand to the camera"
+        }
+        // CATextLayer re-rasterizes its text on every string assignment, even
+        // an identical one — at render rate that was a bitmap redraw per
+        // frame. Only touch it when the words actually change.
+        if text != lastStatusText {
+            lastStatusText = text
+            statusLabel.string = text
         }
     }
 }

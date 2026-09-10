@@ -78,6 +78,22 @@ struct Config: Codable, Equatable {
     var peaceOff: Bool = true          // ✌ held disables AirControl (re-enable from the menu bar)
     var peaceHoldMS: Double = 1000     // hold the peace sign this long to turn off
     var idleAfterMin: Double = 3       // no hand for this long → rest (drop detection rate to save battery)
+    // Lightweight mode: 640×480 capture, ~15 Hz detection, HUD capped ≤60fps.
+    // Defaults ON for Intel Macs — the machines the full pipeline overwhelms —
+    // and the toggle always overrides. Hold gestures are wall-clock timed, so
+    // the lower detection rate changes cost, not feel.
+    var lightweight: Bool = Config.defaultLightweight
+
+    /// Hardware-based default for `lightweight`: absent `hw.optional.arm64`
+    /// means no Apple Silicon — an Intel Mac, where full-rate 720p Vision is
+    /// exactly what made an older MacBook "barely run it". (Rosetta still
+    /// reports the sysctl truthfully, so this reads the real hardware.)
+    static let defaultLightweight: Bool = {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        let found = sysctlbyname("hw.optional.arm64", &value, &size, nil, 0) == 0
+        return !(found && value == 1)
+    }()
 
     // Spaces (M4 pulled forward)
     var switchSpaces: Bool = true      // fired swipe posts ⌃←/⌃→ (needs Accessibility)
@@ -143,6 +159,7 @@ struct Config: Codable, Equatable {
         peaceOff = (try? c.decode(Bool.self, forKey: .peaceOff)) ?? d.peaceOff
         peaceHoldMS = (try? c.decode(Double.self, forKey: .peaceHoldMS)) ?? d.peaceHoldMS
         idleAfterMin = (try? c.decode(Double.self, forKey: .idleAfterMin)) ?? d.idleAfterMin
+        lightweight = (try? c.decode(Bool.self, forKey: .lightweight)) ?? d.lightweight
         switchSpaces = (try? c.decode(Bool.self, forKey: .switchSpaces)) ?? d.switchSpaces
         thumbSwitch = (try? c.decode(Bool.self, forKey: .thumbSwitch)) ?? d.thumbSwitch
         thumbHoldMS = (try? c.decode(Double.self, forKey: .thumbHoldMS)) ?? d.thumbHoldMS
