@@ -28,6 +28,7 @@ struct Config: Codable, Equatable {
     var pinchAlpha: Double = 0.50      // pinch-signal EMA (higher = more responsive)
     var pinchThresh: Double = 0.42     // engage below this (normalized by hand size)
     var pinchHyst: Double = 0.12       // release only above thresh + hyst
+    var pinchReleaseGraceMS: Double = 80 // open signal must persist this long to release — one noisy frame can't drop a held grab
 
     // 4-finger swipe
     var swipeDist: Double = 0.16       // normalized-x travel that fires a swipe
@@ -52,6 +53,8 @@ struct Config: Codable, Equatable {
     var raiseOnGrab: Bool = true         // grabbing a window brings it to front, like a mouse click
     var axWriteMinIntervalMS: Double = 16 // floor between AX position writes; latency adapts above it
     var stickyHoverPx: Double = 16       // pointer must exit target frame by this before retargeting
+    var hoverGraceMS: Double = 150       // …and stay out this long — boundary jitter can't flick the highlight
+    var grabArmMS: Double = 80           // gesture-mode pinch must hold this long before it grabs (mirrors mouseDownDelayMS)
 
     // Mouse mode
     var mouseMode: Bool = false        // pointer drives the real cursor; pinch = left click/drag
@@ -101,6 +104,7 @@ struct Config: Codable, Equatable {
         pinchAlpha = (try? c.decode(Double.self, forKey: .pinchAlpha)) ?? d.pinchAlpha
         pinchThresh = (try? c.decode(Double.self, forKey: .pinchThresh)) ?? d.pinchThresh
         pinchHyst = (try? c.decode(Double.self, forKey: .pinchHyst)) ?? d.pinchHyst
+        pinchReleaseGraceMS = (try? c.decode(Double.self, forKey: .pinchReleaseGraceMS)) ?? d.pinchReleaseGraceMS
         swipeDist = (try? c.decode(Double.self, forKey: .swipeDist)) ?? d.swipeDist
         swipeMaxTimeMS = (try? c.decode(Double.self, forKey: .swipeMaxTimeMS)) ?? d.swipeMaxTimeMS
         swipeCooldownMS = (try? c.decode(Double.self, forKey: .swipeCooldownMS)) ?? d.swipeCooldownMS
@@ -118,6 +122,8 @@ struct Config: Codable, Equatable {
         useMockWindows = (try? c.decode(Bool.self, forKey: .useMockWindows)) ?? d.useMockWindows
         axWriteMinIntervalMS = (try? c.decode(Double.self, forKey: .axWriteMinIntervalMS)) ?? d.axWriteMinIntervalMS
         stickyHoverPx = (try? c.decode(Double.self, forKey: .stickyHoverPx)) ?? d.stickyHoverPx
+        hoverGraceMS = (try? c.decode(Double.self, forKey: .hoverGraceMS)) ?? d.hoverGraceMS
+        grabArmMS = (try? c.decode(Double.self, forKey: .grabArmMS)) ?? d.grabArmMS
         mouseMode = (try? c.decode(Bool.self, forKey: .mouseMode)) ?? d.mouseMode
         mouseDragSlopPx = (try? c.decode(Double.self, forKey: .mouseDragSlopPx)) ?? d.mouseDragSlopPx
         mouseDownDelayMS = (try? c.decode(Double.self, forKey: .mouseDownDelayMS)) ?? d.mouseDownDelayMS

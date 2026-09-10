@@ -250,10 +250,23 @@ final class OverlayView: NSView {
     private var mockDragNotified = false
     private var wasPinching = false
 
+    // Grab arming: a pinch means "grab" only after it has survived grabArmMS
+    // — a hand closing into a fist (or fingers just curling) passes through
+    // the pinch shape, and in gesture mode there is no deferred mouse-down
+    // to save us. One pinch gets one grab attempt (grabSpent), so a pinch
+    // begun over nothing can't snatch a window it drifts across mid-hold.
+    private var pinchBegan: CFTimeInterval = -1e9
+    private var grabSpent = false
+    /// How long past the arm a pinch keeps waiting for the async hover query
+    /// to land before it's spent — covers a pinch thrown right as the pointer
+    /// arrives on a window (the old edge-triggered grab just missed those).
+    private let grabAcquireCap: CFTimeInterval = 0.35
+
     // Drag state (real windows, M3). Frames in CG coords (top-left origin).
     private var hoveredTarget: TargetWindow?
     private var latestHover: TargetWindow?
     private var lastHoverQuery: CFTimeInterval = 0
+    private var hoverExitSince: CFTimeInterval?
     private var grabbedTarget: TargetWindow?
     private var grabOffsetCG: CGPoint = .zero
     private var lastDragOrigin: CGPoint?
@@ -402,6 +415,7 @@ final class OverlayView: NSView {
         // hover target so its outline can't linger on the new Space.
         hoveredTarget = nil
         latestHover = nil
+        hoverExitSince = nil
         ghost.opacity = 0
     }
 
@@ -458,6 +472,15 @@ final class OverlayView: NSView {
         let config = configProvider()
         let now = CACurrentMediaTime()
         let handFresh = state.handVisible && (now - lastSeen) < 0.3
+
+        // One clock for "how long has this pinch been held" — the grab paths
+        // arm on it. A fresh pinch also unthrottles the hover query so the
+        // window under the pointer is known by the time the grab arms.
+        if state.pinching, !wasPinching {
+            pinchBegan = now
+            grabSpent = false
+            lastHoverQuery = -1e9
+        }
 
         // Hide the HUD while a Space switch animates — anything drawn during
         // the slide reads as chop. Keyed to the real activeSpaceDidChange
@@ -576,7 +599,12 @@ final class OverlayView: NSView {
             hoveredTarget = nil
             latestHover = nil
             ghost.opacity = 0
-            if state.pinching, !wasPinching, handFresh, let p = pointer, let a = anchor {
+            // Armed, not edge-triggered — same reasoning as the real-window
+            // grab: a transitional pinch never lives grabArmMS.
+            if state.pinching, !grabSpent, grabbed == nil, handFresh,
+               now - pinchBegan >= config.grabArmMS / 1000,
+               let p = pointer, let a = anchor {
+                grabSpent = true // containment is synchronous — hit or miss, this pinch is decided
                 if let win = mockWindows.last(where: { $0.containsInSuperlayer(p) }) {
                     grabbed = win
                     grabStartCenter = win.center
@@ -696,25 +724,48 @@ final class OverlayView: NSView {
             if let hov = hoveredTarget {
                 let m = CGFloat(config.stickyHoverPx)
                 if !hov.frame.insetBy(dx: -m, dy: -m).contains(pCG) {
-                    hoveredTarget = latestHover
-                } else if let fresh = latestHover, fresh.windowID == hov.windowID {
-                    hoveredTarget = fresh // same window — refresh its frame
+                    // Clearly outside — but only a SUSTAINED exit retargets.
+                    // Jitter across the sticky boundary flapped the outline
+                    // and ring tint every frame; the old target now lingers
+                    // hoverGraceMS, and popping back inside cancels the exit.
+                    if hoverExitSince == nil { hoverExitSince = now }
+                    if now - hoverExitSince! >= config.hoverGraceMS / 1000 {
+                        hoveredTarget = latestHover
+                        hoverExitSince = nil
+                    }
+                } else {
+                    hoverExitSince = nil
+                    if let fresh = latestHover, fresh.windowID == hov.windowID {
+                        hoveredTarget = fresh // same window — refresh its frame
+                    }
                 }
             } else {
-                hoveredTarget = latestHover
+                hoveredTarget = latestHover // acquiring is instant; only letting go is damped
+                hoverExitSince = nil
             }
         } else if !handFresh {
             hoveredTarget = nil
             latestHover = nil
         }
 
-        // Grab on the pinch edge; drag from the eased knuckle anchor.
-        if state.pinching, !wasPinching, handFresh, let t = hoveredTarget, let a = anchor {
-            grabbedTarget = t
-            let aCG = cgPoint(fromView: a)
-            grabOffsetCG = CGPoint(x: t.frame.origin.x - aCG.x, y: t.frame.origin.y - aCG.y)
-            lastDragOrigin = t.frame.origin
-            mover.beginDrag(t, raise: config.raiseOnGrab)
+        // Grab once the pinch has ARMED (held grabArmMS), not on its raw edge
+        // — the arm outlives every transitional pose, and it buys the async
+        // hover query time to land, so pinching right as the pointer arrives
+        // on a window commits instead of silently missing. Past the acquire
+        // cap with still nothing hovered, the pinch is spent — like pressing
+        // a mouse button over the desktop. Drag from the eased knuckle anchor.
+        if state.pinching, !grabSpent, grabbedTarget == nil, handFresh,
+           now - pinchBegan >= config.grabArmMS / 1000 {
+            if let t = hoveredTarget, let a = anchor {
+                grabSpent = true
+                grabbedTarget = t
+                let aCG = cgPoint(fromView: a)
+                grabOffsetCG = CGPoint(x: t.frame.origin.x - aCG.x, y: t.frame.origin.y - aCG.y)
+                lastDragOrigin = t.frame.origin
+                mover.beginDrag(t, raise: config.raiseOnGrab)
+            } else if now - pinchBegan >= grabAcquireCap {
+                grabSpent = true
+            }
         }
         if !state.pinching, grabbedTarget != nil {
             mover.endDrag(at: lastDragOrigin) // window commits where dropped

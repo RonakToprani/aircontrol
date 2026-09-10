@@ -36,6 +36,7 @@ struct GestureState {
 final class GestureEngine {
     private var pinchSmooth: Double?
     private var pinching = false
+    private var pinchOpenSince: CFTimeInterval?
     private var scrollGrab = false
     private var fistSince: CFTimeInterval?
     private var fistGoneSince: CFTimeInterval?
@@ -92,6 +93,7 @@ final class GestureEngine {
             if now - lastSeen > handLostReset {
                 pinching = false
                 pinchSmooth = nil
+                pinchOpenSince = nil
                 if scrollGrab { // fist slid out of frame mid-scroll: clutch
                     clutchUntil = now + config.scrollClutchMS / 1000
                 }
@@ -118,6 +120,7 @@ final class GestureEngine {
             s.anchor = frozenAnchor ?? s.anchor
             pinching = false
             pinchSmooth = nil
+            pinchOpenSince = nil
             scrollGrab = false
             fistSince = nil
             palmHist.removeAll()
@@ -146,9 +149,22 @@ final class GestureEngine {
         let smooth = pinchSmooth.map { $0 + config.pinchAlpha * (raw - $0) } ?? raw
         pinchSmooth = smooth
         if pinching {
-            if smooth > config.pinchThresh + config.pinchHyst { pinching = false }
+            // Release only when the signal STAYS open: one noisy landmark
+            // frame can spike the smoothed distance past the release line,
+            // and an instant release drops a held window mid-drag. Same
+            // grace pattern as the fist's fistGoneSince below.
+            if smooth > config.pinchThresh + config.pinchHyst {
+                if pinchOpenSince == nil { pinchOpenSince = now }
+                if now - pinchOpenSince! >= config.pinchReleaseGraceMS / 1000 {
+                    pinching = false
+                    pinchOpenSince = nil
+                }
+            } else {
+                pinchOpenSince = nil
+            }
         } else if smooth < config.pinchThresh, !scrollGrab {
             pinching = true // a scroll fist curling tighter can't become a click
+            pinchOpenSince = nil
             clutchUntil = -1e9 // a deliberate pinch ends the scroll clutch
         }
         s.pinchRaw = raw
@@ -204,6 +220,7 @@ final class GestureEngine {
         if scrollGrab {
             pinching = false
             pinchSmooth = nil
+            pinchOpenSince = nil
             s.pinching = false
         }
         s.scrollGrab = scrollGrab

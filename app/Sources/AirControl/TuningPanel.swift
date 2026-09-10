@@ -70,8 +70,12 @@ struct TuningView: View {
             }
             Section("Pinch") {
                 slider("Signal smoothing (pinchAlpha)", $store.config.pinchAlpha, 0.1...0.9, "%.2f")
-                slider("Threshold", $store.config.pinchThresh, 0.2...0.8, "%.2f")
-                slider("Release hysteresis", $store.config.pinchHyst, 0.02...0.3, "%.2f")
+                slider("Threshold", $store.config.pinchThresh, 0.2...0.8, "%.2f",
+                       help: "Engage when the thumb–index distance drops below this")
+                slider("Release hysteresis", $store.config.pinchHyst, 0.02...0.3, "%.2f",
+                       help: "Release only above threshold + this gap — a borderline pinch can't chatter")
+                slider("Release grace (ms)", $store.config.pinchReleaseGraceMS, 0...250, "%.0f",
+                       help: "The open signal must last this long before a pinch lets go — one noisy frame can't drop a held grab")
             }
             Section("Mouse mode") {
                 Toggle("Pointer drives the real cursor", isOn: $store.config.mouseMode)
@@ -144,6 +148,10 @@ struct TuningView: View {
                        help: "Minimum gap between window-position writes; slow apps auto-throttle above it")
                 slider("Sticky hover margin (px)", $store.config.stickyHoverPx, 0...50, "%.0f",
                        help: "Pointer must exit the target window by this much before retargeting")
+                slider("Hover linger (ms)", $store.config.hoverGraceMS, 0...400, "%.0f",
+                       help: "…and stay out this long — jitter at a window edge can't flick the highlight")
+                slider("Grab arm time (ms)", $store.config.grabArmMS, 0...250, "%.0f",
+                       help: "A pinch must hold this long before it grabs — a hand closing through the pinch shape can't snatch a window")
                 readout("AX write latency", String(format: "%.1f ms", app.axLatencyMS))
             }
             Section("Spaces") {
