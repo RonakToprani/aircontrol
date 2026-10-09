@@ -58,7 +58,7 @@ enum UpdateChecker {
     }
 
     /// Numeric dotted-version compare; unequal lengths pad with zeros.
-    private static func isNewer(_ a: String, than b: String) -> Bool {
+    static func isNewer(_ a: String, than b: String) -> Bool {
         let av = a.split(separator: ".").map { Int($0) ?? 0 }
         let bv = b.split(separator: ".").map { Int($0) ?? 0 }
         for i in 0..<max(av.count, bv.count) {

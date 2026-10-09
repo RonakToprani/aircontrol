@@ -8,6 +8,11 @@ let package = Package(
         .executableTarget(
             name: "AirControl",
             path: "Sources/AirControl"
+        ),
+        .testTarget(
+            name: "AirControlTests",
+            dependencies: ["AirControl"],
+            path: "Tests/AirControlTests"
         )
     ]
 )
