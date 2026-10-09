@@ -194,7 +194,12 @@ private final class MockWindowLayer: CALayer {
         content.position.y = stripesBaseY - scrollPhase
     }
 
+    private var lookHovered = false, lookGrabbed = false, lookSet = false
     func setLook(hovered: Bool, grabbed: Bool) {
+        // Written only on change — shadowRadius/border rewrites every frame
+        // invalidate the layer's shadow for no visible difference.
+        if lookSet, hovered == lookHovered, grabbed == lookGrabbed { return }
+        lookSet = true; lookHovered = hovered; lookGrabbed = grabbed
         if grabbed {
             borderColor = NSColor.systemTeal.cgColor
             borderWidth = 2.5
@@ -256,6 +261,10 @@ final class OverlayView: NSView {
     private var grabStartCenter: CGPoint?
     private var mockDragNotified = false
     private var wasPinching = false
+    private enum RingLook { case idle, hovering, pinching, scrolling, dictating }
+    private var ringLook: RingLook? = nil // nil = never written; first frame always writes
+    private var lastGhostRect = CGRect.null
+    private var lastGhostStrong = false
 
     // Grab arming: a pinch means "grab" only after it has survived grabArmMS
     // — a hand closing into a fist (or fingers just curling) passes through
@@ -718,19 +727,36 @@ final class OverlayView: NSView {
         if let p = pointer {
             ring.position = p
             ring.opacity = handFresh ? (state.settling ? 0.35 : 1) : 0.25
+            // The look (fill + scale) is written only when it CHANGES: a
+            // CAShapeLayer setter doesn't compare, so re-assigning the same
+            // colour every tick allocated an NSColor + CGColor and dirtied
+            // the layer for nothing. Position/opacity above stay per-frame.
+            let look: RingLook
             if dictating {
-                // Push-to-talk live: unmistakably NOT a click.
-                ring.fillColor = NSColor.systemOrange.withAlphaComponent(0.8).cgColor
-                ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
+                look = .dictating // push-to-talk live: unmistakably NOT a click
             } else if state.pinching {
-                ring.fillColor = NSColor.systemTeal.withAlphaComponent(0.85).cgColor
-                ring.transform = CATransform3DMakeScale(0.65, 0.65, 1)
+                look = .pinching
             } else if config.mouseMode, state.scrollGrab {
-                ring.fillColor = NSColor.systemIndigo.withAlphaComponent(0.5).cgColor
-                ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
+                look = .scrolling
             } else {
-                ring.fillColor = NSColor.systemTeal.withAlphaComponent(hoverActive ? 0.3 : 0.12).cgColor
-                ring.transform = CATransform3DIdentity
+                look = hoverActive ? .hovering : .idle
+            }
+            if look != ringLook {
+                ringLook = look
+                switch look {
+                case .dictating:
+                    ring.fillColor = NSColor.systemOrange.withAlphaComponent(0.8).cgColor
+                    ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
+                case .pinching:
+                    ring.fillColor = NSColor.systemTeal.withAlphaComponent(0.85).cgColor
+                    ring.transform = CATransform3DMakeScale(0.65, 0.65, 1)
+                case .scrolling:
+                    ring.fillColor = NSColor.systemIndigo.withAlphaComponent(0.5).cgColor
+                    ring.transform = CATransform3DMakeScale(0.8, 0.8, 1)
+                case .hovering, .idle:
+                    ring.fillColor = NSColor.systemTeal.withAlphaComponent(look == .hovering ? 0.3 : 0.12).cgColor
+                    ring.transform = CATransform3DIdentity
+                }
             }
         }
 
@@ -952,6 +978,13 @@ final class OverlayView: NSView {
     }
 
     private func drawGhost(_ r: CGRect, strong: Bool) {
+        // Hover is the steady state in gesture mode: the rect only moves when
+        // the target (or its 0.12s-cadence frame) changes, so rebuilding the
+        // rounded-rect path + three colours every tick was pure churn. A drag
+        // changes the rect every frame and rebuilds exactly as before.
+        if r == lastGhostRect, strong == lastGhostStrong, ghost.opacity == 1 { return }
+        lastGhostRect = r
+        lastGhostStrong = strong
         ghost.frame = r
         ghost.path = CGPath(roundedRect: CGRect(origin: .zero, size: r.size),
                             cornerWidth: 10, cornerHeight: 10, transform: nil)
