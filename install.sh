@@ -13,7 +13,7 @@ set -euo pipefail
 REPO="RonakToprani/aircontrol"
 API="https://api.github.com/repos/$REPO/releases/latest"
 # Pinned to its own tag (not releases/latest) so it still resolves after newer releases ship.
-FALLBACK_DMG="https://github.com/$REPO/releases/download/v0.3.0/AirControl-0.3.0.dmg"
+FALLBACK_DMG="https://github.com/$REPO/releases/download/v0.4.1/AirControl-0.4.1.dmg"
 APP="/Applications/AirControl.app"
 
 bold=$(printf '\033[1m'); green=$(printf '\033[32m'); red=$(printf '\033[31m')

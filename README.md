@@ -20,7 +20,7 @@ brew install --cask --no-quarantine RonakToprani/tap/aircontrol
 
 Works on any Mac running macOS 14 (Sonoma) or newer.
 
-1. **[Download AirControl-0.2.0.dmg](https://github.com/RonakToprani/aircontrol/releases/latest)** and open it, then drag **AirControl** into **Applications**.
+1. **[Download the latest AirControl DMG](https://github.com/RonakToprani/aircontrol/releases/latest)** and open it, then drag **AirControl** into **Applications**.
 2. Open AirControl from Applications. macOS will block it the first time (this test build isn't notarized) — go to **System Settings → Privacy & Security**, scroll down, click **"Open Anyway"**, and confirm.
 3. AirControl lives in the **menu bar** (hand icon, top-right — no Dock icon). Click it → **Enable AirControl**, and allow **Camera** access.
 4. When the **Accessibility** prompt appears: it only *opens* System Settings — you must flip the AirControl switch there yourself (this is how it moves windows).

@@ -1,6 +1,6 @@
 cask "aircontrol" do
-  version "0.3.0"
-  sha256 "7851797bc425b9450d9ea4ea89e8eec53a5983f48ed458c63671e07224a50c35"
+  version "0.4.1"
+  sha256 "fec1d47a49caf8a3b5736fca585a45dd39503a1b52d660373fce10222268e9f9"
 
   url "https://github.com/RonakToprani/aircontrol/releases/download/v#{version}/AirControl-#{version}.dmg"
   name "AirControl"
