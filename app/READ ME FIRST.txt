@@ -20,8 +20,15 @@ AirControl lives in the MENU BAR (a little hand icon, top-right of the
 screen). It has no Dock icon.
 
 
-FIRST RUN
----------
+FIRST RUN — THE WELCOME TOUR
+----------------------------
+The first launch opens a guided Welcome Tour. It walks you through
+everything below, step by step, and lets you PRACTICE each gesture on
+safe practice windows before your hand controls anything real. Nothing
+real is touched until you finish the tour and a 3-second countdown
+hands control over. Replay it any time: hand icon → "Welcome Tour…".
+
+If you'd rather go manual:
 1. Click the hand icon → "Enable AirControl".
 2. Allow CAMERA access when asked.
 3. A prompt will ask for ACCESSIBILITY access (this is how it moves
@@ -41,8 +48,8 @@ Switch desktop  Make a fist, stick your THUMB out sideways pointing
 Turn off     Hold a PEACE SIGN ✌ until the red meter fills.
              (Turn back on from the menu bar icon.)
 
-MOUSE MODE (new)
-----------------
+MOUSE MODE
+----------
 Hold a SHAKA 🤙 (thumb + little finger out) until the purple meter
 fills — now your hand drives the real Mac cursor. Same sign switches
 back. Or use the menu bar toggle. First use asks for Microphone +
@@ -63,5 +70,12 @@ Tips: sit facing the camera in decent light. If the cursor feels off,
 re-run "Calibrate hand range…". The "Show hand preview" menu item shows
 what the camera sees.
 
-This is an early test build — please tell Ronak everything that felt
-confusing, broken, or magical.
+OLDER OR INTEL MACS: "Advanced Tuning…" → Power → "Lightweight mode"
+lowers the camera and detection load (on by default on Intel Macs).
+Every speed, hold time and threshold lives in that panel too.
+
+Updates: hand icon → "Check for Updates…". That is the only time the
+app ever touches the network, and only to read a version number.
+
+Feedback — anything confusing, broken, or magical:
+https://github.com/RonakToprani/aircontrol/issues
