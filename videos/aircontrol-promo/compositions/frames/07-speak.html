@@ -1,0 +1,171 @@
+<template>
+  <style>
+    @font-face{
+      font-family:'Inter';font-style:normal;font-weight:400 800;font-display:swap;
+      src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:'Inter',sans-serif;}
+    #root .clip.p07-ground{position:absolute;left:0;top:0;width:1920px;height:1080px;background:#0A0E14;}
+    #root .p07-kicker{position:absolute;left:154px;top:194px;height:48px;font-weight:700;font-size:40px;line-height:1.2;letter-spacing:0.14em;text-transform:uppercase;color:#33BFD4;white-space:nowrap;}
+    #root .p07-k{position:absolute;left:0;top:0;white-space:nowrap;}
+    #root .p07-lead{position:absolute;left:154px;top:262px;width:560px;max-width:560px;font-weight:400;font-size:34px;line-height:1.3;color:#F2F5F9;}
+    #root .p07-w{display:inline-block;will-change:transform,opacity;}
+    #root .p07-hand{position:absolute;left:270px;top:356px;width:303px;height:367px;overflow:visible;}
+    #root .p07-bone{fill:none;stroke:#33BFD4;stroke-opacity:0.45;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
+    #root .p07-dot{fill:#33BFD4;}
+    #root .p07-panel{position:absolute;left:768px;top:151px;width:1037px;height:713px;background:#10151D;border:1px solid #232C3A;border-radius:14px;box-sizing:border-box;}
+    #root .p07-win{position:absolute;left:880px;top:270px;width:810px;height:440px;background:#151B25;border:1px solid #2E3848;border-radius:10px;box-sizing:border-box;}
+    #root .p07-bar{position:absolute;left:0;top:0;right:0;height:44px;border-bottom:1px solid #2E3848;display:flex;align-items:center;padding-left:16px;}
+    #root .p07-d{width:11px;height:11px;border-radius:50%;margin-right:8px;opacity:0.85;}
+    #root .p07-title{position:absolute;left:0;right:0;top:0;height:44px;line-height:44px;text-align:center;font-size:16px;font-weight:500;color:#C9D1DC;}
+    #root .p07-line{position:absolute;height:9px;border-radius:4px;background:#3A4556;}
+    #root .p07-lbl{position:absolute;left:36px;top:78px;font-size:16px;font-weight:500;color:#C9D1DC;}
+    #root .p07-field{position:absolute;left:36px;top:112px;width:738px;height:96px;border:1px solid #2E3848;border-radius:10px;background:#0A0E14;box-sizing:border-box;}
+    #root .p07-typed{position:absolute;left:28px;top:0;height:94px;line-height:94px;font-size:44px;font-weight:600;color:#F2F5F9;white-space:pre;letter-spacing:-0.01em;}
+    #root .p07-caret{display:inline-block;width:4px;height:48px;background:#33BFD4;vertical-align:-9px;margin-left:3px;border-radius:1px;}
+    #root .p07-glow{position:absolute;left:1475px;top:317px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(240,160,80,0.45) 0%,rgba(240,160,80,0) 70%);opacity:0;}
+    #root .p07-ring{position:absolute;left:1525px;top:367px;width:60px;height:60px;box-sizing:border-box;border:2.5px solid #33BFD4;border-radius:50%;box-shadow:0 0 35px rgba(51,191,212,0.55);}
+    #root .p07-tick{position:absolute;width:5px;height:26px;border-radius:3px;background:#F0A050;opacity:0;transform-origin:50% 50%;}
+  </style>
+  <div id="root" data-composition-id="07-speak" data-start="0" data-duration="3.5" data-width="1920" data-height="1080">
+    <div class="clip p07-ground" data-start="0" data-duration="3.5" data-track-index="0"></div>
+
+    <div class="p07-kicker"><span class="p07-k" id="p07-k1">Thumb</span><span class="p07-k" id="p07-k2">Speak</span></div>
+    <div class="p07-lead">
+      <span class="p07-w">pinch</span> <span class="p07-w">and</span> <span class="p07-w">hold</span> <span class="p07-w">&mdash;</span> <span class="p07-w">speak</span> <span class="p07-w">instead</span> <span class="p07-w">of</span> <span class="p07-w">type.</span>
+    </div>
+
+    <svg class="p07-hand" viewBox="0 0 380 460" xmlns="http://www.w3.org/2000/svg">
+      <g id="p07-bones"></g>
+      <g id="p07-dots"></g>
+    </svg>
+
+    <div class="p07-panel"></div>
+
+    <div class="p07-win">
+      <div class="p07-bar"><span class="p07-d" style="background:#ff5f57"></span><span class="p07-d" style="background:#febc2e"></span><span class="p07-d" style="background:#28c840"></span></div>
+      <div class="p07-title">New Message</div>
+      <div class="p07-lbl">Message</div>
+      <div class="p07-field"><div class="p07-typed"><span id="p07-text"></span><span class="p07-caret" id="p07-caret"></span></div></div>
+      <div class="p07-line" style="left:36px;top:250px;width:420px;"></div>
+      <div class="p07-line" style="left:36px;top:282px;width:560px;"></div>
+      <div class="p07-line" style="left:36px;top:314px;width:300px;"></div>
+      <div class="p07-line" style="left:36px;top:370px;width:90px;height:30px;border-radius:8px;background:#52607A;"></div>
+    </div>
+
+    <div class="p07-glow" id="p07-glow"></div>
+    <div class="p07-ring" id="p07-ring"></div>
+    <div class="p07-tick" id="p07-t0" style="left:1494px;top:384px;"></div>
+    <div class="p07-tick" id="p07-t1" style="left:1503px;top:384px;"></div>
+    <div class="p07-tick" id="p07-t2" style="left:1512px;top:384px;"></div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script>
+    (function(){
+      window.__timelines = window.__timelines || {};
+      var DUR = 2.9;
+      var tl = gsap.timeline({ paused: true });
+      var NS = "http://www.w3.org/2000/svg";
+
+      // ---- hand constellation (open palm, pinch held) ----
+      var P = {
+        wrist:[200,420],
+        th:[[150,390],[110,350],[80,310],[58,275]],
+        ix:[[150,300],[138,235],[132,190],[128,150]],
+        md:[[198,290],[196,215],[195,165],[194,120]],
+        rg:[[243,295],[250,225],[253,180],[256,140]],
+        lt:[[285,310],[300,255],[308,220],[315,188]]
+      };
+      var PINCH = [100,215];
+      var chains = ["th","ix","md","rg","lt"];
+      var boneEls = [], dotEls = [];
+      var gB = document.getElementById("p07-bones"), gD = document.getElementById("p07-dots");
+      function mk(tag, parent, cls){ var e = document.createElementNS(NS, tag); e.setAttribute("class", cls); parent.appendChild(e); return e; }
+      // segments: [aRef, bRef] where ref = ['w'] | [chain, idx]
+      var segs = [];
+      chains.forEach(function(c){
+        segs.push([["w"],[c,0]]);
+        for (var i=0;i<3;i++) segs.push([[c,i],[c,i+1]]);
+      });
+      ["th","ix","md","rg","lt"].slice(0,4).forEach(function(c,i){ segs.push([[c,0],[chains[i+1],0]]); });
+      segs.forEach(function(){ boneEls.push(mk("line", gB, "p07-bone")); });
+      var pts = [["w"]];
+      chains.forEach(function(c){ for (var i=0;i<4;i++) pts.push([c,i]); });
+      pts.forEach(function(){ var d = mk("circle", gD, "p07-dot"); d.setAttribute("r","6.75"); dotEls.push(d); });
+      function lerp(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]; }
+      function pos(ref, p){
+        if (ref[0]==="w") return P.wrist;
+        var base = P[ref[0]][ref[1]];
+        if (ref[0]==="th" && ref[1]===3) return lerp(base, PINCH, p);
+        if (ref[0]==="ix" && ref[1]===3) return lerp(base, PINCH, p);
+        if (ref[0]==="th" && ref[1]===2) return lerp(base, [88,292], p);
+        if (ref[0]==="ix" && ref[1]===2) return lerp(base, [126,186], p);
+        return base;
+      }
+      function render(p){
+        segs.forEach(function(s,i){
+          var a = pos(s[0],p), b = pos(s[1],p);
+          boneEls[i].setAttribute("x1",a[0]); boneEls[i].setAttribute("y1",a[1]);
+          boneEls[i].setAttribute("x2",b[0]); boneEls[i].setAttribute("y2",b[1]);
+        });
+        pts.forEach(function(r,i){
+          var a = pos(r,p);
+          dotEls[i].setAttribute("cx",a[0]); dotEls[i].setAttribute("cy",a[1]);
+        });
+      }
+      render(0);
+      var pinch = { p: 0 };
+      tl.to(pinch, { p: 1, duration: 0.6, ease: "power2.inOut", onUpdate: function(){ render(pinch.p); } }, 0.5);
+      tl.to(pinch, { p: 0, duration: 0.4, ease: "power2.out", onUpdate: function(){ render(pinch.p); } }, 2.2);
+
+      // ---- Scene 1: kicker swap THUMB -> SPEAK ----
+      tl.fromTo("#p07-k1", { opacity:1, y:0 }, { opacity:0, y:-8, duration:0.18, ease:"power2.in" }, 0.12);
+      tl.fromTo("#p07-k2", { opacity:0, y:8 }, { opacity:1, y:0, duration:0.22, ease:"power2.out" }, 0.22);
+
+      // ---- Scene 2: ring shrinks, turns orange, glow, level ticks ----
+      tl.fromTo("#p07-ring", { scale:1 }, { scale:0.65, duration:0.3, ease:"power2.inOut" }, 0.5);
+      tl.to("#p07-ring", { borderColor:"#F0A050", boxShadow:"0 0 40px rgba(240,160,80,0.65)", duration:0.25, ease:"power1.out" }, 0.8);
+      tl.fromTo("#p07-glow", { opacity:0, scale:0.6 }, { opacity:1, scale:1, duration:0.4, ease:"power2.out" }, 0.8);
+      var peaks = [[1.0,0.5,1.3],[0.6,1.3,0.8],[1.2,0.7,1.1]];
+      for (var i=0;i<3;i++){
+        var id = "#p07-t"+i, t0 = 0.95 + i*0.07;
+        tl.fromTo(id, { opacity:0, scaleY:0.3 }, { opacity:1, scaleY:0.6, duration:0.15, ease:"power2.out" }, t0);
+        for (var k=0;k<5;k++){
+          var tt = t0 + 0.15 + k*0.22;
+          tl.to(id, { scaleY: 0.4 + 0.9*((k*7+i*3)%5)/4 + 0.3, duration:0.11, ease:"sine.inOut" }, tt);
+          tl.to(id, { scaleY: 0.35, duration:0.11, ease:"sine.inOut" }, tt+0.11);
+        }
+      }
+
+      // ---- Scene 3: words land behind a blinking caret ----
+      var SEQ = [
+        { t:0,    text:"" },
+        { t:1.15, text:"ship" },
+        { t:1.55, text:"ship it" },
+        { t:1.95, text:"ship it tonight" }
+      ];
+      var textEl = document.getElementById("p07-text"), caretEl = document.getElementById("p07-caret");
+      var CYCLES = 5; // 0.58s period over 2.9s, whole number
+      var drv = { t:0 };
+      tl.to(drv, { t:DUR, duration:DUR, ease:"none", onUpdate:function(){
+        var s = "";
+        for (var i=SEQ.length-1;i>=0;i--){ if (drv.t >= SEQ[i].t){ s = SEQ[i].text; break; } }
+        textEl.textContent = s;
+        var typing = false;
+        for (var j=1;j<SEQ.length;j++){ if (drv.t >= SEQ[j].t && drv.t - SEQ[j].t < 0.2) typing = true; }
+        var on = typing || Math.sin(drv.t/DUR * Math.PI*2*CYCLES) > 0;
+        caretEl.style.opacity = on ? "1" : "0";
+        caretEl.style.background = (drv.t >= 0.8 && drv.t < 2.2) ? "#F0A050" : "#33BFD4";
+      }}, 0);
+
+      // ---- Scene 4: lead reveal, release -> ring teal, text stays ----
+      tl.fromTo(".p07-w", { opacity:0, y:14 }, { opacity:1, y:0, duration:0.3, ease:"power2.out", stagger:0.05 }, 2.2);
+      tl.to("#p07-ring", { scale:1, borderColor:"#33BFD4", boxShadow:"0 0 35px rgba(51,191,212,0.55)", duration:0.35, ease:"power2.out" }, 2.2);
+      tl.to("#p07-glow", { opacity:0, duration:0.35, ease:"power1.out" }, 2.2);
+      tl.to(".p07-tick", { opacity:0, duration:0.2, ease:"power1.out" }, 2.2);
+
+      window.__timelines["07-speak"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,11 @@
+{
+  "provider": "auto",
+  "speed": "1.0",
+  "lines": [],
+  "bgm": {
+    "mode": "retrieve",
+    "query": "confident minimal electronic tech build, dark and clean, steady pulse around 100 BPM, rising energy, no vocals",
+    "blob": "Your Mac, controlled by a wave of your hand.",
+    "arc": "Demo Loop — hook (the magic move) → promise → gesture cycle ×5 → trust → brand"
+  }
+}

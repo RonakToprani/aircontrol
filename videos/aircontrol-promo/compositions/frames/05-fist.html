@@ -1,0 +1,185 @@
+<template>
+  <style>
+    @font-face{
+      font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;
+      src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    @font-face{
+      font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;
+      src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:'Inter',sans-serif;}
+    #root .clip.p05-ground{position:absolute;left:0;top:0;width:1920px;height:1080px;background:#0A0E14;}
+    #root .p05-kicker{position:absolute;left:154px;top:194px;height:48px;width:400px;font-weight:700;font-size:40px;line-height:1.2;letter-spacing:0.14em;text-transform:uppercase;color:#33BFD4;}
+    #root .p05-kicker #p05-k2{opacity:0;}
+    #root .p05-kicker span{position:absolute;left:0;top:0;white-space:nowrap;}
+    #root .p05-lead{position:absolute;left:154px;top:262px;width:560px;max-width:560px;font-size:34px;line-height:1.3;font-weight:400;color:#F2F5F9;}
+    #root .p05-lead .p05-w{display:inline-block;margin-right:0.28em;will-change:transform,opacity;}
+    #root .p05-hand{position:absolute;left:270px;top:356px;width:304px;height:368px;}
+    #root .p05-hand svg{width:304px;height:368px;overflow:visible;display:block;}
+    #root .p05-panel{position:absolute;left:768px;top:151px;width:1037px;height:713px;background:#10151D;border:1px solid #232C3A;border-radius:14px;box-sizing:border-box;overflow:hidden;}
+    #root .p05-win{position:absolute;background:#151B25;border:1px solid #2E3848;border-radius:10px;box-sizing:border-box;overflow:hidden;background-color:#151B25;}
+    #root .p05-bar{position:absolute;left:0;top:0;right:0;height:44px;border-bottom:1px solid #2E3848;}
+    #root .p05-dot{position:absolute;top:16px;width:11px;height:11px;border-radius:50%;}
+    #root .p05-title{position:absolute;left:0;right:0;top:0;height:44px;line-height:44px;text-align:center;font-size:16px;font-weight:500;color:#C9D1DC;}
+    #root .p05-body{position:absolute;left:0;right:0;top:44px;bottom:0;overflow:hidden;}
+    #root .p05-scroller{position:absolute;left:0;top:0;width:100%;will-change:transform;}
+    #root .p05-row{height:11px;border-radius:6px;background:#3A4556;margin:0 0 17px 44px;}
+    #root .p05-head{height:20px;border-radius:6px;background:#52607A;margin:34px 0 22px 44px;}
+    #root .p05-track{position:absolute;right:12px;top:58px;bottom:14px;width:4px;border-radius:2px;background:#232C3A;}
+    #root .p05-thumb{position:absolute;left:0;top:0;width:4px;height:70px;border-radius:2px;background:#52607A;}
+    #root .p05-lines{position:absolute;left:30px;right:30px;top:70px;}
+    #root .p05-lines i{display:block;height:9px;border-radius:5px;background:#3A4556;margin-bottom:18px;}
+    #root .p05-ring{position:absolute;left:1122px;top:532px;width:60px;height:60px;box-sizing:border-box;border-radius:50%;border:2.5px solid #33BFD4;background:rgba(51,191,212,0.06);box-shadow:0 0 24px rgba(51,191,212,0.55);}
+  </style>
+  <div id="root" data-composition-id="05-fist" data-start="0" data-duration="3.3" data-width="1920" data-height="1080">
+    <div id="f05-ground" class="clip p05-ground" data-start="0" data-duration="3.3" data-track-index="0"></div>
+
+    <div class="p05-kicker"><span id="p05-k1">Pinch</span><span id="p05-k2">Fist</span></div>
+    <div class="p05-lead" id="p05-lead"><span class="p05-w">make</span><span class="p05-w">a</span><span class="p05-w">fist</span><span class="p05-w">to</span><span class="p05-w">scroll.</span></div>
+
+    <div class="p05-hand" id="p05-hand">
+      <svg viewBox="0 0 380 460" id="p05-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+
+    <div class="p05-panel" id="p05-panel">
+      <div class="p05-win" id="p05-back" style="left:40px;top:60px;width:380px;height:440px;">
+        <div class="p05-bar"><i class="p05-dot" style="left:16px;background:#FF5F57"></i><i class="p05-dot" style="left:35px;background:#FEBC2E"></i><i class="p05-dot" style="left:54px;background:#28C840"></i></div>
+        <div class="p05-title">Notes</div>
+        <div class="p05-lines"><i style="width:70%"></i><i style="width:92%"></i><i style="width:55%"></i><i style="width:80%"></i><i style="width:64%"></i></div>
+      </div>
+      <div class="p05-win" id="p05-doc" style="left:90px;top:60px;width:857px;height:594px;transform-origin:0 0;">
+        <div class="p05-bar"><i class="p05-dot" style="left:16px;background:#FF5F57"></i><i class="p05-dot" style="left:35px;background:#FEBC2E"></i><i class="p05-dot" style="left:54px;background:#28C840"></i></div>
+        <div class="p05-title">Document</div>
+        <div class="p05-body">
+          <div class="p05-scroller" id="p05-scroller"></div>
+          <div class="p05-track"><div class="p05-thumb" id="p05-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p05-ring" id="p05-ring"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    const NS = "http://www.w3.org/2000/svg";
+
+    // ---- document rows (faint lines + a few bolder headings), built deterministically ----
+    const scroller = document.getElementById("p05-scroller");
+    const widths = [86, 92, 78, 90, 64, 88, 72, 94, 58, 84];
+    let html = "";
+    for (let s = 0; s < 6; s++) {
+      html += '<div class="p05-head" style="width:' + (34 + (s % 3) * 9) + '%"></div>';
+      for (let r = 0; r < 7; r++) {
+        html += '<div class="p05-row" style="width:' + widths[(s * 7 + r) % widths.length] + '%"></div>';
+      }
+    }
+    scroller.innerHTML = html;
+
+    // ---- hand constellation: open palm -> fist ----
+    const OPEN = {
+      w: [200, 420],
+      t: [[150, 390], [110, 350], [80, 310], [58, 275]],
+      i: [[150, 300], [138, 235], [132, 190], [128, 150]],
+      m: [[198, 290], [196, 215], [195, 165], [194, 120]],
+      r: [[243, 295], [250, 225], [253, 180], [256, 140]],
+      l: [[285, 310], [300, 255], [308, 220], [315, 188]]
+    };
+    const FIST = {
+      w: [200, 420],
+      t: [[150, 390], [140, 370], [158, 350], [170, 330]],
+      i: [[150, 300], [156, 272], [166, 298], [160, 330]],
+      m: [[198, 290], [200, 255], [206, 285], [205, 320]],
+      r: [[243, 295], [246, 262], [248, 292], [245, 330]],
+      l: [[285, 310], [288, 282], [286, 310], [280, 345]]
+    };
+    const fingers = ["i", "m", "r", "l", "t"];
+    const svg = document.getElementById("p05-svg");
+    const pts = {}; // key -> {el, open, fist}
+    const mk = (name, tag, attrs) => {
+      const e = document.createElementNS(NS, tag);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      svg.appendChild(e);
+      return e;
+    };
+    const lines = [];
+    const addLine = (a, b) => {
+      const pa = a === "w" ? { open: OPEN.w, fist: FIST.w } : pts[a];
+      const pb = pts[b];
+      const el = mk("l", "line", {
+        x1: pa.open[0], y1: pa.open[1], x2: pb.open[0], y2: pb.open[1],
+        stroke: "#33BFD4", "stroke-opacity": "0.45", "stroke-width": "2.08", "stroke-linecap": "round"
+      });
+      lines.push({ el, a, b });
+    };
+    // register points first (circles are appended after lines so dots sit on top)
+    fingers.forEach((f) => {
+      for (let j = 0; j < 4; j++) pts[f + j] = { open: OPEN[f][j], fist: FIST[f][j], f, j };
+    });
+    pts.w = { open: OPEN.w, fist: FIST.w };
+    fingers.forEach((f) => {
+      addLine("w", f + "0");
+      for (let j = 0; j < 3; j++) addLine(f + j, f + (j + 1));
+    });
+    addLine("i0", "m0"); addLine("m0", "r0"); addLine("r0", "l0");
+    pts.w.el = mk("w", "circle", { cx: 200, cy: 420, r: 8.1, fill: "#33BFD4" });
+    fingers.forEach((f) => {
+      for (let j = 0; j < 4; j++) {
+        pts[f + j].el = mk(f + j, "circle", { cx: OPEN[f][j][0], cy: OPEN[f][j][1], r: j === 3 ? 8.1 : 6.75, fill: "#33BFD4" });
+      }
+    });
+
+    // tween a pose change for every moving point + its attached line ends
+    function pose(target, startAt, perFinger, jointStep, dur, ease) {
+      fingers.forEach((f, fi) => {
+        for (let j = 1; j < 4; j++) {
+          const p = pts[f + j];
+          const at = startAt + fi * perFinger + (j - 1) * jointStep;
+          const to = target === "fist" ? p.fist : p.open;
+          tl.to(p.el, { attr: { cx: to[0], cy: to[1] }, duration: dur, ease }, at);
+          lines.forEach((L) => {
+            if (L.b === f + j) tl.to(L.el, { attr: { x2: to[0], y2: to[1] }, duration: dur, ease }, at);
+            if (L.a === f + j) tl.to(L.el, { attr: { x1: to[0], y1: to[1] }, duration: dur, ease }, at);
+          });
+        }
+      });
+    }
+
+    // ---- Scene 1 (0.0-0.5): kicker hard-cut swap PINCH -> FIST, right window grows into the Document ----
+    tl.set("#p05-k1", { opacity: 1 }, 0);
+    tl.set("#p05-k1", { opacity: 0 }, 0.12);
+    tl.set("#p05-k2", { opacity: 1 }, 0.12);
+    tl.fromTo("#p05-doc", { x: 360, y: 90, scaleX: 0.63, scaleY: 0.707 }, { x: 0, y: 0, scaleX: 1, scaleY: 1, duration: 0.5, ease: "power3.inOut" }, 0);
+    tl.to("#p05-back", { opacity: 0, duration: 0.3, ease: "power1.out" }, 0.05);
+
+    // ---- Scene 2 (0.5-1.0): fingers curl into a fist (staggered by finger), ring -> indigo + shrink ----
+    pose("fist", 0.5, 0.045, 0.03, 0.26, "power2.inOut");
+    tl.to("#p05-ring", {
+      scale: 0.82, borderColor: "#6E6BFF", backgroundColor: "rgba(110,107,255,0.22)",
+      boxShadow: "0 0 30px rgba(110,107,255,0.65)", duration: 0.3, ease: "power2.out"
+    }, 0.55);
+
+    // ---- Scene 3 (1.0-2.1): hand rises ~12% of frame height (130px); rows scroll 3x (390px), then coast ----
+    tl.to("#p05-hand", { y: -130, duration: 0.6, ease: "power2.in" }, 1.0);
+    tl.to("#p05-ring", { y: -130, duration: 0.6, ease: "power2.in" }, 1.0);
+    tl.to("#p05-scroller", { y: -390, duration: 0.6, ease: "power2.in" }, 1.0);
+    tl.to("#p05-thumb", { y: 56, duration: 0.6, ease: "power2.in" }, 1.0);
+    // momentum tail: long expo decay after the hand has stopped
+    tl.to("#p05-scroller", { y: -690, duration: 1.1, ease: "expo.out" }, 1.6);
+    tl.to("#p05-thumb", { y: 99, duration: 1.1, ease: "expo.out" }, 1.6);
+
+    // ---- Scene 4 (2.1-2.8): lead line reveals word by word; fist opens; ring back to teal; hold ----
+    tl.fromTo("#p05-lead .p05-w", { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "expo.out", stagger: 0.07 }, 2.1);
+    pose("open", 2.25, 0.04, 0.025, 0.26, "power2.inOut");
+    tl.to("#p05-ring", {
+      scale: 1, borderColor: "#33BFD4", backgroundColor: "rgba(51,191,212,0.06)",
+      boxShadow: "0 0 24px rgba(51,191,212,0.55)", duration: 0.3, ease: "power2.out"
+    }, 2.25);
+
+    window.__timelines["05-fist"] = tl;
+  </script>
+</template>

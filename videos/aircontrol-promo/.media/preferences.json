@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "preferences": {
+    "destination": {
+      "value": "social",
+      "confirmed_in": [
+        "aircontrol-promo"
+      ],
+      "updated_at": "2026-10-09T05:30:41.302Z"
+    },
+    "aspect": {
+      "value": "1920x1080",
+      "confirmed_in": [
+        "aircontrol-promo"
+      ],
+      "updated_at": "2026-10-09T05:30:45.631Z"
+    },
+    "language": {
+      "value": "en",
+      "confirmed_in": [
+        "aircontrol-promo"
+      ],
+      "updated_at": "2026-10-09T05:30:45.657Z"
+    },
+    "flow": {
+      "value": "automation",
+      "confirmed_in": [
+        "aircontrol-promo"
+      ],
+      "updated_at": "2026-10-09T05:30:45.681Z"
+    },
+    "storyboard": {
+      "value": "no",
+      "confirmed_in": [
+        "aircontrol-promo"
+      ],
+      "updated_at": "2026-10-09T05:30:45.705Z"
+    },
+    "style_preset.product-launch-video": {
+      "value": "broadside",
+      "confirmed_in": [
+        "aircontrol-promo"
+      ],
+      "updated_at": "2026-10-09T05:31:50.735Z"
+    }
+  },
+  "sightings": {}
+}

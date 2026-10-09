@@ -1,0 +1,149 @@
+<template>
+  <style>
+    @font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');}
+    @font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');}
+    @font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');}
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:'Inter',sans-serif;}
+    #root .clip.p06-ground{position:absolute;left:0;top:0;width:1920px;height:1080px;background:#0A0E14;}
+    #root .p06-kicker{position:absolute;left:154px;top:194px;height:48px;width:400px;font-weight:700;font-size:40px;line-height:1.2;letter-spacing:0.14em;text-transform:uppercase;color:#33BFD4;}
+    #root .p06-kicker span{position:absolute;left:0;top:0;white-space:nowrap;}
+    #root .p06-lead{position:absolute;left:154px;top:262px;width:560px;max-width:560px;font-size:34px;line-height:1.3;font-weight:400;color:#F2F5F9;}
+    #root .p06-lead .p06-w{display:inline-block;margin-right:0.26em;will-change:transform,opacity,filter;}
+    #root .p06-hand{position:absolute;left:254px;top:356px;width:336px;height:368px;}
+    #root .p06-panel{position:absolute;left:768px;top:151px;width:1037px;height:713px;background:#10151D;border:1px solid #232C3A;border-radius:14px;overflow:hidden;box-sizing:border-box;}
+    #root .p06-space{position:absolute;left:0;top:0;width:100%;height:100%;background:#10151D;}
+    #root .p06-space.p06-new{border-left:1px solid #232C3A;box-sizing:border-box;}
+    #root .p06-win{position:absolute;background:#151B25;border:1px solid #2E3848;border-radius:10px;overflow:hidden;box-sizing:border-box;}
+    #root .p06-bar{height:38px;border-bottom:1px solid #2E3848;display:flex;align-items:center;padding:0 14px;gap:8px;box-sizing:border-box;}
+    #root .p06-dot{width:11px;height:11px;border-radius:50%;}
+    #root .p06-title{margin-left:10px;font-size:16px;font-weight:600;color:#C9D1DC;}
+    #root .p06-body{padding:20px 22px;}
+    #root .p06-ln{height:9px;border-radius:5px;background:#3A4556;margin-bottom:15px;}
+    #root .p06-ln.p06-h{height:14px;background:#52607A;width:42%;margin-bottom:22px;}
+    #root .p06-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;padding:0 22px 22px;}
+    #root .p06-cell{height:34px;border-radius:5px;border:1px solid #3A4556;}
+    #root .p06-cell.p06-on{background:rgba(51,191,212,0.14);border-color:rgba(51,191,212,0.4);}
+    #root .p06-flash{position:absolute;left:0;top:22px;width:100%;text-align:center;z-index:5;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-weight:500;font-size:22px;letter-spacing:0.14em;text-transform:uppercase;color:#33BFD4;opacity:0;}
+    #root .p06-ring{position:absolute;left:1256px;top:480px;width:80px;height:80px;z-index:6;}
+  </style>
+  <div id="root" data-composition-id="06-thumb" data-start="0" data-duration="3.1" data-width="1920" data-height="1080">
+    <div id="p06-ground" class="clip p06-ground" data-start="0" data-duration="3.1" data-track-index="0"></div>
+
+    <div class="p06-kicker"><span class="p06-k1">Fist</span><span class="p06-k2">Thumb</span></div>
+    <div class="p06-lead"><span class="p06-w">point</span><span class="p06-w">your</span><span class="p06-w">thumb</span><span class="p06-w">to</span><span class="p06-w">switch</span><span class="p06-w">desktops.</span></div>
+
+    <svg class="p06-hand" id="p06-hand" viewBox="0 0 420 460" xmlns="http://www.w3.org/2000/svg"><g id="p06-lines"></g><g id="p06-dots"></g></svg>
+
+    <div class="p06-panel" id="p06-panel">
+      <div class="p06-space p06-old" id="p06-old">
+        <div class="p06-win" style="left:96px;top:96px;width:640px;height:470px;">
+          <div class="p06-bar"><i class="p06-dot" style="background:#FF5F57"></i><i class="p06-dot" style="background:#FEBC2E"></i><i class="p06-dot" style="background:#28C840"></i><span class="p06-title">Document</span></div>
+          <div class="p06-body" id="p06-doc"></div>
+        </div>
+      </div>
+      <div class="p06-space p06-new" id="p06-new">
+        <div class="p06-win" style="left:56px;top:84px;width:470px;height:340px;">
+          <div class="p06-bar"><i class="p06-dot" style="background:#FF5F57"></i><i class="p06-dot" style="background:#FEBC2E"></i><i class="p06-dot" style="background:#28C840"></i><span class="p06-title">Mail</span></div>
+          <div class="p06-body" id="p06-mail"></div>
+        </div>
+        <div class="p06-win" style="left:520px;top:236px;width:450px;height:370px;">
+          <div class="p06-bar"><i class="p06-dot" style="background:#FF5F57"></i><i class="p06-dot" style="background:#FEBC2E"></i><i class="p06-dot" style="background:#28C840"></i><span class="p06-title">Calendar</span></div>
+          <div class="p06-body" style="padding-bottom:14px"><div class="p06-ln p06-h"></div></div>
+          <div class="p06-cal" id="p06-cal"></div>
+        </div>
+      </div>
+      <div class="p06-flash" id="p06-flash">Space &rarr;</div>
+    </div>
+
+    <svg class="p06-ring" id="p06-ring" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="40" cy="40" r="28.75" fill="rgba(51,191,212,0.08)" stroke="#33BFD4" stroke-width="2.5" style="filter:drop-shadow(0 0 11px rgba(51,191,212,0.6))"/>
+      <circle id="p06-arc" cx="40" cy="40" r="35" fill="none" stroke="#33BFD4" stroke-width="3" stroke-linecap="round" transform="rotate(-90 40 40)" style="filter:drop-shadow(0 0 8px rgba(51,191,212,0.8))"/>
+    </svg>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    const $ = (s) => document.querySelector("#root " + s);
+
+    // faint window content (deterministic widths)
+    const widths = [92, 78, 86, 60, 90, 70, 82, 44];
+    $("#p06-doc").innerHTML = '<div class="p06-ln p06-h"></div>' + widths.map((w) => '<div class="p06-ln" style="width:' + w + '%"></div>').join("");
+    $("#p06-mail").innerHTML = [88, 64, 80, 52, 76, 58].map((w, i) => '<div class="p06-ln' + (i % 3 === 0 ? ' p06-h' : '') + '" style="' + (i % 3 === 0 ? '' : 'width:' + w + '%') + '"></div>').join("");
+    let cal = "";
+    for (let i = 0; i < 28; i++) cal += '<div class="p06-cell' + ([3, 9, 10, 17, 22].indexOf(i) >= 0 ? " p06-on" : "") + '"></div>';
+    $("#p06-cal").innerHTML = cal;
+
+    // hand constellation (fist -> thumb out)
+    const NS = "http://www.w3.org/2000/svg";
+    const fixed = [
+      [200, 420],
+      null, null, null, null, // thumb (animated)
+      [150, 300], [165, 282], [172, 310], [160, 330],
+      [198, 290], [205, 272], [212, 300], [205, 320],
+      [243, 295], [247, 278], [250, 310], [245, 330],
+      [285, 310], [285, 298], [285, 330], [280, 345],
+    ];
+    const thumbFist = [[150, 390], [158, 370], [168, 350], [170, 330]];
+    const thumbOut = [[240, 370], [300, 360], [350, 352], [400, 348]];
+    const P = fixed.map((p) => (p ? p.slice() : [0, 0]));
+    const state = { p: 0 };
+    const segs = [];
+    [1, 5, 9, 13, 17].forEach((s) => { segs.push([0, s]); for (let k = 0; k < 3; k++) segs.push([s + k, s + k + 1]); });
+    segs.push([5, 9], [9, 13], [13, 17]);
+    const gl = $("#p06-lines"), gd = $("#p06-dots");
+    const lineEls = segs.map(() => { const l = document.createElementNS(NS, "line"); l.setAttribute("stroke", "rgba(51,191,212,0.45)"); l.setAttribute("stroke-width", "1.95"); gl.appendChild(l); return l; });
+    const dotEls = P.map((_, i) => { const c = document.createElementNS(NS, "circle"); c.setAttribute("r", i === 0 ? 8.8 : 7.4); c.setAttribute("fill", "#33BFD4"); gd.appendChild(c); return c; });
+    const halo = document.createElementNS(NS, "circle");
+    halo.setAttribute("r", 21.6); halo.setAttribute("fill", "rgba(51,191,212,0.22)"); halo.setAttribute("opacity", 0); gd.appendChild(halo);
+    const haloState = { o: 0 };
+    function render() {
+      for (let i = 0; i < 4; i++) {
+        P[1 + i][0] = thumbFist[i][0] + (thumbOut[i][0] - thumbFist[i][0]) * state.p;
+        P[1 + i][1] = thumbFist[i][1] + (thumbOut[i][1] - thumbFist[i][1]) * state.p;
+      }
+      segs.forEach((s, i) => { const a = P[s[0]], b = P[s[1]]; const l = lineEls[i]; l.setAttribute("x1", a[0]); l.setAttribute("y1", a[1]); l.setAttribute("x2", b[0]); l.setAttribute("y2", b[1]); });
+      dotEls.forEach((c, i) => { c.setAttribute("cx", P[i][0]); c.setAttribute("cy", P[i][1]); });
+      halo.setAttribute("cx", P[4][0]); halo.setAttribute("cy", P[4][1]); halo.setAttribute("opacity", haloState.o);
+    }
+    render();
+
+    // hold-meter arc
+    const arc = $("#p06-arc");
+    const CIRC = 2 * Math.PI * 35;
+    arc.setAttribute("stroke-dasharray", CIRC);
+    arc.setAttribute("stroke-dashoffset", CIRC);
+
+    // entrances (hero visible by 0.3s)
+    tl.fromTo("#root .p06-hand", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0);
+    tl.fromTo("#root .p06-panel", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out" }, 0);
+    tl.fromTo("#root .p06-ring", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.35, ease: "expo.out" }, 0.05);
+    tl.fromTo("#root .p06-lead", { opacity: 1 }, { opacity: 1, duration: 0.01 }, 0); // keeps lead container stable; words reveal later
+
+    // Scene 1: kicker FIST -> THUMB
+    tl.fromTo("#root .p06-k1", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.2, ease: "expo.out" }, 0);
+    tl.fromTo("#root .p06-k2", { opacity: 0, y: 10, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.25, ease: "expo.out" }, 0.28);
+    tl.to("#root .p06-k1", { opacity: 0, y: -10, duration: 0.2, ease: "expo.in" }, 0.22);
+
+    // Scene 2: thumb swings out, holds; hold meter fills
+    tl.to(state, { p: 1, duration: 0.38, ease: "expo.out", onUpdate: render }, 0.5);
+    tl.to(haloState, { o: 1, duration: 0.2, ease: "power2.out", onUpdate: render }, 0.78);
+    tl.to(arc, { attr: { "stroke-dashoffset": 0 }, duration: 0.3, ease: "power1.inOut" }, 0.7);
+    tl.fromTo("#root .p06-ring", { scale: 1 }, { scale: 1.12, duration: 0.12, ease: "power2.out", immediateRender: false }, 1.0);
+
+    // Scene 3: Space push-slide (page-slide mechanics: old out left, new in from right)
+    tl.fromTo("#root .p06-new", { xPercent: 100 }, { xPercent: 0, duration: 0.7, ease: "expo.inOut" }, 1.0);
+    tl.to("#root .p06-old", { xPercent: -100, duration: 0.7, ease: "expo.inOut" }, 1.0);
+    tl.to("#root .p06-ring", { scale: 1, duration: 0.3, ease: "power2.out" }, 1.12);
+    tl.to(arc, { attr: { "stroke-dashoffset": CIRC }, duration: 0.3, ease: "power2.in" }, 1.1);
+    tl.fromTo("#root .p06-flash", { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.18, ease: "expo.out" }, 1.0);
+    tl.to("#root .p06-flash", { opacity: 0, x: 16, duration: 0.3, ease: "power2.in" }, 1.5);
+
+    // Scene 4: lead reveals; thumb tucks back; hold
+    tl.fromTo("#root .p06-lead .p06-w", { y: 20, opacity: 0, filter: "blur(8px)" }, { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.5, ease: "expo.out", stagger: 0.08 }, 1.7);
+    tl.to(haloState, { o: 0, duration: 0.2, ease: "power2.out", onUpdate: render }, 1.95);
+    tl.to(state, { p: 0, duration: 0.45, ease: "power3.inOut", onUpdate: render }, 2.0);
+
+    window.__timelines["06-thumb"] = tl;
+  </script>
+</template>

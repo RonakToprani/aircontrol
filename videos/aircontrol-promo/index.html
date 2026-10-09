@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js" integrity="sha384-sG0Hv1tP1lZCk9KQmrIbY/XNwi+OY84GQqhMscbnsoBFqAz8KNCil1kvfL3Hbbk2" crossorigin="anonymous"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #0A0E14;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="26.3"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div
+        id="el-01-the-move"
+        class="scene"
+        data-composition-id="01-the-move"
+        data-composition-src="compositions/frames/01-the-move.html"
+        data-start="0"
+        data-duration="3.8"
+        data-track-index="0"
+      ></div>
+
+      <div
+        id="el-02-promise"
+        class="scene"
+        data-composition-id="02-promise"
+        data-composition-src="compositions/frames/02-promise.html"
+        data-start="3.4"
+        data-duration="3"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-03-point"
+        class="scene"
+        data-composition-id="03-point"
+        data-composition-src="compositions/frames/03-point.html"
+        data-start="6"
+        data-duration="3.1"
+        data-track-index="0"
+      ></div>
+
+      <div
+        id="el-04-pinch"
+        class="scene"
+        data-composition-id="04-pinch"
+        data-composition-src="compositions/frames/04-pinch.html"
+        data-start="8.6"
+        data-duration="3.7"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-05-fist"
+        class="scene"
+        data-composition-id="05-fist"
+        data-composition-src="compositions/frames/05-fist.html"
+        data-start="11.8"
+        data-duration="3.3"
+        data-track-index="0"
+      ></div>
+
+      <div
+        id="el-06-thumb"
+        class="scene"
+        data-composition-id="06-thumb"
+        data-composition-src="compositions/frames/06-thumb.html"
+        data-start="14.600000000000001"
+        data-duration="3.1"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-07-speak"
+        class="scene"
+        data-composition-id="07-speak"
+        data-composition-src="compositions/frames/07-speak.html"
+        data-start="17.200000000000003"
+        data-duration="3.5"
+        data-track-index="0"
+      ></div>
+
+      <div
+        id="el-08-on-your-mac"
+        class="scene"
+        data-composition-id="08-on-your-mac"
+        data-composition-src="compositions/frames/08-on-your-mac.html"
+        data-start="20.1"
+        data-duration="3.3"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-09-aircontrol"
+        class="scene"
+        data-composition-id="09-aircontrol"
+        data-composition-src="compositions/frames/09-aircontrol.html"
+        data-start="22.900000000000002"
+        data-duration="3.4"
+        data-track-index="0"
+      ></div>
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+      // ── frame transitions (injected by transitions.mjs) ──
+      (function () { var tl = window.__timelines["main"];
+        tl.to("#el-01-the-move", { scale: 2.5, opacity: 0, filter: "blur(8px)", duration: 0.4, ease: "power3.in" }, 3.4);
+        tl.fromTo("#el-02-promise", { scale: 0.5, opacity: 0, filter: "blur(8px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.4, ease: "power3.out" }, 3.4);
+        tl.to("#el-02-promise", { scale: 2.5, opacity: 0, filter: "blur(8px)", duration: 0.4, ease: "power3.in" }, 6);
+        tl.fromTo("#el-03-point", { scale: 0.5, opacity: 0, filter: "blur(8px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.4, ease: "power3.out" }, 6);
+        tl.to("#el-03-point", { x: -1920, duration: 0.5, ease: "power3.inOut" }, 8.6);
+        tl.fromTo("#el-04-pinch", { x: 1920, opacity: 1 }, { x: 0, opacity: 1, duration: 0.5, ease: "power3.inOut" }, 8.6);
+        tl.to("#el-04-pinch", { x: -1920, duration: 0.5, ease: "power3.inOut" }, 11.8);
+        tl.fromTo("#el-05-fist", { x: 1920, opacity: 1 }, { x: 0, opacity: 1, duration: 0.5, ease: "power3.inOut" }, 11.8);
+        tl.to("#el-05-fist", { x: -1920, duration: 0.5, ease: "power3.inOut" }, 14.6);
+        tl.fromTo("#el-06-thumb", { x: 1920, opacity: 1 }, { x: 0, opacity: 1, duration: 0.5, ease: "power3.inOut" }, 14.6);
+        tl.to("#el-06-thumb", { x: -1920, duration: 0.5, ease: "power3.inOut" }, 17.2);
+        tl.fromTo("#el-07-speak", { x: 1920, opacity: 1 }, { x: 0, opacity: 1, duration: 0.5, ease: "power3.inOut" }, 17.2);
+        tl.to("#el-07-speak", { filter: "blur(10px)", scale: 1.03, opacity: 0, duration: 0.6, ease: "power2.inOut" }, 20.1);
+        tl.fromTo("#el-08-on-your-mac", { filter: "blur(10px)", scale: 0.97, opacity: 0 }, { filter: "blur(0px)", scale: 1, opacity: 1, duration: 0.6, ease: "power2.inOut" }, 20.1);
+        tl.to("#el-08-on-your-mac", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 22.9);
+        tl.fromTo("#el-09-aircontrol", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, 22.9);
+        tl.to({}, { duration: 26.3 }, 0); // full-span anchor — main.duration() == composition total (Studio master duration)
+      })();
+    </script>
+  </body>
+</html>

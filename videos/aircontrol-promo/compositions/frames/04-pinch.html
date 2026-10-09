@@ -1,0 +1,284 @@
+<template>
+  <style>
+    @font-face{
+      font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;
+      src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    @font-face{
+      font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;
+      src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');
+      unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+    }
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:'Inter',sans-serif;color:#F2F5F9;}
+    #root .clip.p04-ground{position:absolute;left:0;top:0;width:1920px;height:1080px;background:#0A0E14;}
+
+    /* LEFT column — kicker + lead (shared stage: kicker x 8% / y 18%, lead y 25%) */
+    #root .p04-kicker{position:absolute;left:154px;top:194px;display:inline-flex;min-width:240px;white-space:nowrap;
+      font-weight:700;font-size:40px;line-height:1.2;letter-spacing:0.14em;text-transform:uppercase;color:#33BFD4;}
+    #root .p04-lead{position:absolute;left:154px;top:262px;max-width:560px;white-space:nowrap;
+      font-weight:400;font-size:34px;line-height:1.3;color:#F2F5F9;}
+    #root .p04-lead .p04-w{display:inline-block;margin-right:0.28em;will-change:transform,opacity,filter;}
+    #root .p04-lead .p04-w:last-child{margin-right:0;}
+
+    /* hand constellation — 380x460 box scaled to ~34% frame height, centered at (422,540) */
+    #root .p04-hand{position:absolute;left:270px;top:356px;width:304px;height:368px;will-change:transform;}
+    #root .p04-hand svg{display:block;width:304px;height:368px;overflow:visible;}
+    #root .p04-bone{stroke:#33BFD4;stroke-opacity:0.45;stroke-width:1.82;stroke-linecap:round;}
+    #root .p04-lm{fill:#33BFD4;}
+    #root .p04-tip{fill:#5FD8EA;}
+    #root .p04-contact{fill:#9FEFF8;opacity:0;}
+
+    /* RIGHT column — desktop panel x 40%→94%, y 14%→80% */
+    #root .p04-desk{position:absolute;left:768px;top:151px;width:1037px;height:713px;box-sizing:border-box;
+      background:#10151D;border:1px solid #232C3A;border-radius:14px;overflow:hidden;}
+    #root .p04-win{position:absolute;box-sizing:border-box;background:#151B25;border:1px solid #2E3848;border-radius:10px;overflow:hidden;}
+    #root .p04-win-a{left:42px;top:64px;width:560px;height:400px;box-shadow:0 6px 18px rgba(0,0,0,0.3);}
+    #root .p04-win-b{left:402px;top:281px;width:460px;height:300px;box-shadow:0 8px 24px rgba(0,0,0,0.35);transform-origin:50% 50%;will-change:transform;}
+    #root .p04-bar{position:relative;height:44px;border-bottom:1px solid #2E3848;display:flex;align-items:center;}
+    #root .p04-dots{position:absolute;left:16px;top:16px;display:flex;gap:8px;}
+    #root .p04-dots i{display:block;width:11px;height:11px;border-radius:50%;background:#5F6878;}
+    #root .p04-dots i:nth-child(2){opacity:0.75;}
+    #root .p04-dots i:nth-child(3){opacity:0.5;}
+    #root .p04-title{width:100%;text-align:center;font-size:16px;font-weight:500;letter-spacing:0.02em;color:#C9D1DC;}
+    #root .p04-body{padding:26px 28px;display:flex;flex-direction:column;gap:18px;}
+    #root .p04-line{height:8px;background:#3A4556;}
+    #root .p04-ghost{position:absolute;inset:0;border:1px solid #33BFD4;border-radius:10px;opacity:0;pointer-events:none;}
+    #root .p04-burst{position:absolute;left:402px;top:281px;width:460px;height:300px;border-radius:50%;
+      background:radial-gradient(closest-side,rgba(51,191,212,0.9),rgba(51,191,212,0));filter:blur(60px);opacity:0;transform-origin:50% 50%;}
+
+    /* pointer ring — 44px thin teal circle; handoff_in at (1382,454) abs = (592,281) inside the desk */
+    #root .p04-ring{position:absolute;left:584px;top:273px;width:60px;height:60px;box-sizing:border-box;border-radius:50%;
+      border:2.5px solid #33BFD4;box-shadow:0 0 24px 0 rgba(51,191,212,0.55),0 0 2px 0 rgba(159,239,248,0);
+      transform-origin:50% 50%;will-change:transform;}
+    #root .p04-streak{position:absolute;left:534px;top:300px;width:160px;height:6px;border-radius:3px;opacity:0;
+      background:linear-gradient(90deg,rgba(51,191,212,0),rgba(51,191,212,0.8),rgba(51,191,212,0));transform-origin:50% 50%;}
+  </style>
+
+  <div id="root" data-composition-id="04-pinch" data-start="0" data-duration="3.7" data-width="1920" data-height="1080">
+    <div id="f04-pinch-ground" class="clip p04-ground" data-start="0" data-duration="3.7" data-track-index="0"></div>
+
+    <!-- LEFT: kicker (discrete word-swap) + lead (per-word reveal) -->
+    <div class="p04-kicker"><span class="p04-kicker-text">POINT</span></div>
+    <div class="p04-lead">
+      <span class="p04-s1"><span class="p04-w">pinch</span><span class="p04-w">to</span><span class="p04-w">click.</span></span>
+      <span class="p04-s2"><span class="p04-w">hold</span><span class="p04-w">to</span><span class="p04-w">drag.</span></span>
+    </div>
+
+    <!-- hand constellation: 21 landmarks, open palm -->
+    <div class="p04-hand">
+      <svg viewBox="0 0 380 460" xmlns="http://www.w3.org/2000/svg">
+        <g class="p04-bones">
+          <line class="p04-bone" data-a="0" data-b="1" x1="200" y1="420" x2="150" y2="390"/>
+          <line class="p04-bone" data-a="1" data-b="2" x1="150" y1="390" x2="110" y2="350"/>
+          <line class="p04-bone" data-a="2" data-b="3" x1="110" y1="350" x2="80" y2="310"/>
+          <line class="p04-bone" data-a="3" data-b="4" x1="80" y1="310" x2="58" y2="275"/>
+          <line class="p04-bone" data-a="0" data-b="5" x1="200" y1="420" x2="150" y2="300"/>
+          <line class="p04-bone" data-a="5" data-b="6" x1="150" y1="300" x2="138" y2="235"/>
+          <line class="p04-bone" data-a="6" data-b="7" x1="138" y1="235" x2="132" y2="190"/>
+          <line class="p04-bone" data-a="7" data-b="8" x1="132" y1="190" x2="128" y2="150"/>
+          <line class="p04-bone" data-a="0" data-b="9" x1="200" y1="420" x2="198" y2="290"/>
+          <line class="p04-bone" data-a="9" data-b="10" x1="198" y1="290" x2="196" y2="215"/>
+          <line class="p04-bone" data-a="10" data-b="11" x1="196" y1="215" x2="195" y2="165"/>
+          <line class="p04-bone" data-a="11" data-b="12" x1="195" y1="165" x2="194" y2="120"/>
+          <line class="p04-bone" data-a="0" data-b="13" x1="200" y1="420" x2="243" y2="295"/>
+          <line class="p04-bone" data-a="13" data-b="14" x1="243" y1="295" x2="250" y2="225"/>
+          <line class="p04-bone" data-a="14" data-b="15" x1="250" y1="225" x2="253" y2="180"/>
+          <line class="p04-bone" data-a="15" data-b="16" x1="253" y1="180" x2="256" y2="140"/>
+          <line class="p04-bone" data-a="0" data-b="17" x1="200" y1="420" x2="285" y2="310"/>
+          <line class="p04-bone" data-a="17" data-b="18" x1="285" y1="310" x2="300" y2="255"/>
+          <line class="p04-bone" data-a="18" data-b="19" x1="300" y1="255" x2="308" y2="220"/>
+          <line class="p04-bone" data-a="19" data-b="20" x1="308" y1="220" x2="315" y2="188"/>
+          <line class="p04-bone" data-a="5" data-b="9" x1="150" y1="300" x2="198" y2="290"/>
+          <line class="p04-bone" data-a="9" data-b="13" x1="198" y1="290" x2="243" y2="295"/>
+          <line class="p04-bone" data-a="13" data-b="17" x1="243" y1="295" x2="285" y2="310"/>
+        </g>
+        <circle class="p04-contact" cx="100" cy="215" r="16"/>
+        <g class="p04-dots-g">
+          <circle class="p04-lm" data-i="0" cx="200" cy="420" r="8.1"/>
+          <circle class="p04-lm" data-i="1" cx="150" cy="390" r="8.1"/>
+          <circle class="p04-lm" data-i="2" cx="110" cy="350" r="8.1"/>
+          <circle class="p04-lm" data-i="3" cx="80" cy="310" r="8.1"/>
+          <circle class="p04-lm p04-tip p04-tip-thumb" data-i="4" cx="58" cy="275" r="10.8"/>
+          <circle class="p04-lm" data-i="5" cx="150" cy="300" r="8.1"/>
+          <circle class="p04-lm" data-i="6" cx="138" cy="235" r="8.1"/>
+          <circle class="p04-lm" data-i="7" cx="132" cy="190" r="8.1"/>
+          <circle class="p04-lm p04-tip p04-tip-index" data-i="8" cx="128" cy="150" r="10.8"/>
+          <circle class="p04-lm" data-i="9" cx="198" cy="290" r="8.1"/>
+          <circle class="p04-lm" data-i="10" cx="196" cy="215" r="8.1"/>
+          <circle class="p04-lm" data-i="11" cx="195" cy="165" r="8.1"/>
+          <circle class="p04-lm p04-tip" data-i="12" cx="194" cy="120" r="10.8"/>
+          <circle class="p04-lm" data-i="13" cx="243" cy="295" r="8.1"/>
+          <circle class="p04-lm" data-i="14" cx="250" cy="225" r="8.1"/>
+          <circle class="p04-lm" data-i="15" cx="253" cy="180" r="8.1"/>
+          <circle class="p04-lm p04-tip" data-i="16" cx="256" cy="140" r="10.8"/>
+          <circle class="p04-lm" data-i="17" cx="285" cy="310" r="8.1"/>
+          <circle class="p04-lm" data-i="18" cx="300" cy="255" r="8.1"/>
+          <circle class="p04-lm" data-i="19" cx="308" cy="220" r="8.1"/>
+          <circle class="p04-lm p04-tip" data-i="20" cx="315" cy="188" r="10.8"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- RIGHT: desktop panel with two mock windows, the ring, the streak -->
+    <div class="p04-desk">
+      <div class="p04-win p04-win-a">
+        <div class="p04-bar"><div class="p04-dots"><i></i><i></i><i></i></div><div class="p04-title">Inbox</div></div>
+        <div class="p04-body">
+          <div class="p04-line" style="width:72%"></div>
+          <div class="p04-line" style="width:48%"></div>
+          <div class="p04-line" style="width:86%"></div>
+          <div class="p04-line" style="width:58%"></div>
+          <div class="p04-line" style="width:76%"></div>
+          <div class="p04-line" style="width:40%"></div>
+        </div>
+      </div>
+      <div class="p04-burst"></div>
+      <div class="p04-win p04-win-b">
+        <div class="p04-bar"><div class="p04-dots"><i></i><i></i><i></i></div><div class="p04-title">Draft</div></div>
+        <div class="p04-body">
+          <div class="p04-line" style="width:64%"></div>
+          <div class="p04-line" style="width:88%"></div>
+          <div class="p04-line" style="width:52%"></div>
+          <div class="p04-line" style="width:74%"></div>
+        </div>
+        <div class="p04-ghost"></div>
+      </div>
+      <div class="p04-streak"></div>
+      <div class="p04-ring"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+      var R = document.querySelector('[data-composition-id="04-pinch"]') || document.querySelector('#root');
+      var $ = function (s) { return R.querySelector(s); };
+      var $$ = function (s) { return Array.prototype.slice.call(R.querySelectorAll(s)); };
+      var DUR = 3.2;
+      var tl = gsap.timeline({ paused: true });
+
+      /* ---------- Scene 1 (0.0–0.5): kicker hard-cut word-swap (discrete-text-sequence) ---------- */
+      var SEQ = [ { t: 0.0, text: "POINT" }, { t: 0.30, text: "PINCH" } ];
+      function textAt(t) { for (var i = SEQ.length - 1; i >= 0; i--) { if (t >= SEQ[i].t) return SEQ[i].text; } return ""; }
+      var kickerEl = $(".p04-kicker-text");
+      var drv = { t: 0 };
+      tl.to(drv, { t: DUR, duration: DUR, ease: "none", onUpdate: function () { kickerEl.textContent = textAt(drv.t); } }, 0);
+
+      /* ---------- hand landmarks: open palm base + pinch targets ---------- */
+      var BASE = [
+        [200,420],
+        [150,390],[110,350],[80,310],[58,275],
+        [150,300],[138,235],[132,190],[128,150],
+        [198,290],[196,215],[195,165],[194,120],
+        [243,295],[250,225],[253,180],[256,140],
+        [285,310],[300,255],[308,220],[315,188]
+      ];
+      var PINCH = {};
+      PINCH[2] = [113,342]; PINCH[3] = [86,284]; PINCH[4] = [97,222];
+      PINCH[6] = [136,232]; PINCH[7] = [121,197]; PINCH[8] = [104,210];
+      var lmEls = $$(".p04-lm"), boneEls = $$(".p04-bone");
+      var pos = BASE.map(function (p) { return [p[0], p[1]]; });
+      function setPose(p) {
+        for (var i = 0; i < BASE.length; i++) {
+          var tgt = PINCH[i];
+          if (tgt) { pos[i][0] = BASE[i][0] + (tgt[0] - BASE[i][0]) * p; pos[i][1] = BASE[i][1] + (tgt[1] - BASE[i][1]) * p; }
+        }
+        for (var k = 0; k < lmEls.length; k++) {
+          var el = lmEls[k], idx = +el.getAttribute("data-i");
+          if (PINCH[idx]) { el.setAttribute("cx", pos[idx][0].toFixed(2)); el.setAttribute("cy", pos[idx][1].toFixed(2)); }
+        }
+        for (var b = 0; b < boneEls.length; b++) {
+          var ln = boneEls[b], a = +ln.getAttribute("data-a"), c = +ln.getAttribute("data-b");
+          if (PINCH[a] || PINCH[c]) {
+            ln.setAttribute("x1", pos[a][0].toFixed(2)); ln.setAttribute("y1", pos[a][1].toFixed(2));
+            ln.setAttribute("x2", pos[c][0].toFixed(2)); ln.setAttribute("y2", pos[c][1].toFixed(2));
+          }
+        }
+      }
+      var pose = { p: 0 };
+      setPose(0);
+
+      /* ---------- Scene 2 (0.5–0.9): the pinch — tips meet, ring shrinks + brightens, window ghost + lift ---------- */
+      var PINCH_T = 0.5;
+      tl.to(pose, { p: 1, duration: 0.35, ease: "power3.inOut", onUpdate: function () { setPose(pose.p); } }, PINCH_T);
+      tl.to(".p04-tip-thumb, .p04-tip-index", { attr: { r: 12.8, fill: "#9FEFF8" }, duration: 0.3, ease: "power2.out" }, PINCH_T + 0.05);
+      // contact flash where the tips meet
+      tl.fromTo(".p04-contact", { opacity: 0 }, { opacity: 0.55, duration: 0.12, ease: "power2.out", immediateRender: false }, 0.78);
+      tl.to(".p04-contact", { opacity: 0, duration: 0.35, ease: "power2.in" }, 0.9);
+
+      // ring: shrink to 65% and brighten
+      var RING_REST = "0 0 24px 0 rgba(51,191,212,0.55),0 0 2px 0 rgba(159,239,248,0)";
+      var RING_HOT  = "0 0 38px 0 rgba(51,191,212,0.95),0 0 8px 0 rgba(159,239,248,0.9)";
+      tl.to(".p04-ring", { scale: 0.65, borderColor: "#8FEAF5", boxShadow: RING_HOT, duration: 0.25, ease: "power2.out" }, PINCH_T + 0.05);
+
+      // sticky-hover ghost outline on the window under the ring
+      tl.to(".p04-ghost", { opacity: 1, duration: 0.15, ease: "power1.out" }, PINCH_T + 0.05);
+
+      // press-release-spring (adapted): linear press, spring release that LIFTS the window (scale 1.025, deeper shadow)
+      var PRESS_START = 0.55, PRESS_DUR = 0.12, RELEASE_START = PRESS_START + PRESS_DUR;
+      var SH_REST = "0 8px 24px rgba(0,0,0,0.35)";
+      var SH_PRESSED = "0 3px 10px rgba(0,0,0,0.45)";
+      var SH_LIFTED = "0 26px 60px rgba(0,0,0,0.6)";
+      var SH_SETTLE = "0 14px 44px rgba(0,0,0,0.7)";
+      tl.to(".p04-win-b", { scale: 0.975, boxShadow: SH_PRESSED, duration: PRESS_DUR, ease: "power1.in" }, PRESS_START);
+      tl.to(".p04-win-b", { scale: 1.025, boxShadow: SH_LIFTED, duration: 0.45, ease: "back.out(1.6)" }, RELEASE_START);
+      // subtle burst behind the window on release
+      tl.fromTo(".p04-burst", { scale: 1, opacity: 0 }, { scale: 2.4, opacity: 0.18, duration: 0.45, ease: "power2.out", immediateRender: false }, RELEASE_START);
+      tl.to(".p04-burst", { opacity: 0, duration: 0.5, ease: "power2.in" }, RELEASE_START + 0.46);
+
+      /* ---------- Scene 3 (0.9–2.2): DRAG along an S-curve, then release ---------- */
+      // cubic bezier in delta space: ring (1382,454) -> (1152,562) abs, i.e. delta (-230,+108)
+      var P = [[0, 0], [-30, 120], [-200, -10], [-230, 108]];
+      function bez(t) {
+        var u = 1 - t;
+        return [
+          u*u*u*P[0][0] + 3*u*u*t*P[1][0] + 3*u*t*t*P[2][0] + t*t*t*P[3][0],
+          u*u*u*P[0][1] + 3*u*u*t*P[1][1] + 3*u*t*t*P[2][1] + t*t*t*P[3][1]
+        ];
+      }
+      function bezD(t) {
+        var u = 1 - t;
+        return [
+          3*u*u*(P[1][0]-P[0][0]) + 6*u*t*(P[2][0]-P[1][0]) + 3*t*t*(P[3][0]-P[2][0]),
+          3*u*u*(P[1][1]-P[0][1]) + 6*u*t*(P[2][1]-P[1][1]) + 3*t*t*(P[3][1]-P[2][1])
+        ];
+      }
+      var ringEl = $(".p04-ring"), winEl = $(".p04-win-b"), handEl = $(".p04-hand"), streakEl = $(".p04-streak");
+      var drag = { p: 0 };
+      function setDrag(p) {
+        var d = bez(p), v = bezD(p);
+        gsap.set(ringEl, { x: d[0], y: d[1] });
+        gsap.set(winEl, { x: d[0], y: d[1] });
+        gsap.set(handEl, { x: d[0] / 3, y: d[1] / 3 });
+        var w = Math.max(0, 1 - Math.abs(p - 0.5) / 0.18);
+        var ang = Math.atan2(v[1], v[0]) * 180 / Math.PI;
+        gsap.set(streakEl, { x: d[0], y: d[1], rotation: ang, scaleX: 0.4 + 0.9 * w, opacity: w * w * 0.55 });
+      }
+      var DRAG_START = 0.9, DRAG_DUR = 1.05, DRAG_END = DRAG_START + DRAG_DUR; // 1.95
+      tl.to(drag, { p: 1, duration: DRAG_DUR, ease: "power2.inOut", onUpdate: function () { setDrag(drag.p); } }, DRAG_START);
+      // brief directional blur only at the fastest point (midpoint of the eased travel)
+      tl.fromTo(".p04-win-b", { filter: "blur(0px)" }, { filter: "blur(2.5px)", duration: 0.14, ease: "power2.in", immediateRender: false }, 1.28);
+      tl.to(".p04-win-b", { filter: "blur(0px)", duration: 0.16, ease: "power2.out" }, 1.43);
+
+      // RELEASE at DRAG_END: fingertips part, ring back to full, outline fades, shadow deepens then relaxes
+      tl.to(pose, { p: 0, duration: 0.3, ease: "power2.out", onUpdate: function () { setPose(pose.p); } }, DRAG_END);
+      tl.to(".p04-tip-thumb, .p04-tip-index", { attr: { r: 10.8, fill: "#5FD8EA" }, duration: 0.3, ease: "power2.out" }, DRAG_END);
+      tl.to(".p04-ring", { scale: 1, borderColor: "#33BFD4", boxShadow: RING_REST, duration: 0.4, ease: "back.out(1.7)" }, DRAG_END);
+      tl.to(".p04-ghost", { opacity: 0, duration: 0.25, ease: "power1.inOut" }, DRAG_END);
+      tl.to(".p04-win-b", { scale: 1, boxShadow: SH_SETTLE, duration: 0.18, ease: "power2.in" }, DRAG_END);
+      tl.to(".p04-win-b", { boxShadow: SH_REST, duration: 0.5, ease: "power2.out" }, DRAG_END + 0.18);
+      // the hand relaxes back to its rest position (handoff_out: x≈22% / y≈50%, open palm)
+      tl.fromTo(handEl, { x: P[3][0] / 3, y: P[3][1] / 3 }, { x: 0, y: 0, duration: 0.55, ease: "power2.inOut", immediateRender: false }, DRAG_END);
+
+      /* ---------- Scene 4 (2.2–3.2): lead line, per-word staggered reveal — two cues, one per sentence ---------- */
+      var wIn = { y: 14, opacity: 0, filter: "blur(8px)" };
+      var wOut = { y: 0, opacity: 1, filter: "blur(0px)", ease: "expo.out" };
+      tl.fromTo(".p04-s1 .p04-w", wIn, Object.assign({ duration: 0.42, stagger: 0.07 }, wOut), 2.2);
+      tl.fromTo(".p04-s2 .p04-w", wIn, Object.assign({ duration: 0.4, stagger: 0.07 }, wOut), 2.62);
+
+      window.__timelines["04-pinch"] = tl;
+    })();
+  </script>
+</template>

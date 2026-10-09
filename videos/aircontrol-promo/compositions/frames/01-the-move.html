@@ -1,0 +1,568 @@
+<template>
+<style>
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 500;
+    font-display: block;
+    src: url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 800;
+    font-display: block;
+    src: url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format("woff2");
+  }
+
+  #root {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    container-type: size;
+    font-family: "Inter", sans-serif;
+    color: #f2f5f9;
+  }
+  .clip {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── ground ─────────────────────────────────────────── */
+  .f01-the-move-ground { background: #0a0e14; }
+
+  /* ── ambient glow (behind the window, travels with it) ─ */
+  .f01-the-move-glow {
+    position: absolute;
+    left: 20px;
+    top: 0;
+    width: 1240px;
+    height: 1000px;
+    opacity: 0.28;
+    background: radial-gradient(
+      closest-side,
+      rgba(16, 140, 160, 0.9) 0%,
+      rgba(16, 140, 160, 0.34) 40%,
+      rgba(14, 122, 140, 0) 72%
+    );
+    will-change: transform, opacity;
+  }
+
+  /* ── mock window "Notes" ────────────────────────────── */
+  .f01-the-move-win-move {
+    position: absolute;
+    left: 320px;
+    top: 300px;
+    width: 640px;
+    height: 400px;
+    will-change: transform;
+  }
+  .f01-the-move-win-card {
+    position: absolute;
+    inset: 0;
+    background: #10151d;
+    border: 1px solid #232c3a;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    transform-origin: 50% 50%;
+    overflow: hidden;
+  }
+  .f01-the-move-win-ghost {
+    position: absolute;
+    inset: -1px;
+    border: 1px solid #33bfd4;
+    border-radius: 11px;
+    box-shadow: 0 0 28px rgba(51, 191, 212, 0.32), inset 0 0 18px rgba(51, 191, 212, 0.08);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .f01-the-move-titlebar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    height: 40px;
+    border-bottom: 1px solid #232c3a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: #8b94a7;
+  }
+  .f01-the-move-lights {
+    position: absolute;
+    left: 14px;
+    top: 14px;
+    display: flex;
+    gap: 8px;
+  }
+  .f01-the-move-lights i {
+    display: block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    opacity: 0.85;
+  }
+  .f01-the-move-lights i:nth-child(1) { background: #ff5f57; }
+  .f01-the-move-lights i:nth-child(2) { background: #febc2e; }
+  .f01-the-move-lights i:nth-child(3) { background: #28c840; }
+  .f01-the-move-side {
+    position: absolute;
+    left: 0;
+    top: 41px;
+    bottom: 0;
+    width: 170px;
+    border-right: 1px solid #232c3a;
+    padding: 22px 18px;
+  }
+  .f01-the-move-main {
+    position: absolute;
+    left: 171px;
+    top: 41px;
+    right: 0;
+    bottom: 0;
+    padding: 28px 32px;
+  }
+  .f01-the-move-line {
+    height: 8px;
+    border-radius: 3px;
+    background: #232c3a;
+    margin-bottom: 14px;
+  }
+  .f01-the-move-line-t {
+    height: 12px;
+    background: #5f6878;
+    opacity: 0.55;
+    margin-bottom: 22px;
+  }
+  .f01-the-move-side .f01-the-move-line { margin-bottom: 16px; }
+
+  /* ── hand constellation (lower-left) ────────────────── */
+  .f01-the-move-hand {
+    position: absolute;
+    left: 10px;
+    top: 450px;
+    width: 360px;
+    height: 436px;
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+  .f01-the-move-hand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .f01-the-move-hand line { stroke: rgba(51, 191, 212, 0.45); stroke-width: 1.3; }
+  .f01-the-move-hand circle { fill: #33bfd4; }
+
+  /* ── pointer ring ───────────────────────────────────── */
+  .f01-the-move-ring-pos {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    will-change: transform;
+  }
+  .f01-the-move-ring-burst {
+    position: absolute;
+    left: -30px;
+    top: -30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(14, 122, 140, 0.9) 0%, rgba(14, 122, 140, 0) 70%);
+    filter: blur(10px);
+    opacity: 0;
+    z-index: 1;
+  }
+  .f01-the-move-ring-jit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: 2;
+  }
+  .f01-the-move-ring-core {
+    position: absolute;
+    left: -30px;
+    top: -30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 2px solid #33bfd4;
+    background: rgba(51, 191, 212, 0.05);
+    box-shadow: 0 0 18px rgba(51, 191, 212, 0.5), 0 0 2px rgba(51, 191, 212, 0.9);
+    transform-origin: 50% 50%;
+  }
+
+  /* ── kinetic type (upper-left) ──────────────────────── */
+  .f01-the-move-type {
+    position: absolute;
+    left: 106px;
+    top: 150px;
+  }
+  .f01-the-move-h1 {
+    font-size: 144px;
+    font-weight: 800;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    text-transform: lowercase;
+    color: #f2f5f9;
+    white-space: nowrap;
+    opacity: 0;
+    will-change: transform, opacity, filter;
+  }
+  .f01-the-move-h1 + .f01-the-move-h1 { margin-top: 10px; }
+  .f01-the-move-h1 .f01-the-move-dot { color: #33bfd4; }
+  #f01-the-move-p1 { transform-origin: 8% 50%; }
+</style>
+
+<div id="root" data-composition-id="01-the-move" data-width="1920" data-height="1080" data-duration="3.8">
+  <svg width="0" height="0" style="position:absolute;left:0;top:0" aria-hidden="true">
+    <defs>
+      <filter id="f01-the-move-mblur" x="-25%" y="-10%" width="150%" height="120%" color-interpolation-filters="sRGB">
+        <feGaussianBlur id="f01-the-move-mblur-fe" stdDeviation="0 0" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- track 0: flat ink-black ground -->
+  <div id="f01-the-move-layer-ground" class="clip f01-the-move-ground" data-start="0" data-duration="3.8" data-track-index="0"></div>
+
+  <!-- track 1: ambient teal glow behind the window -->
+  <div id="f01-the-move-layer-glow" class="clip" data-start="0" data-duration="3.8" data-track-index="1">
+    <div class="f01-the-move-glow" id="f01-the-move-glow"></div>
+  </div>
+
+  <!-- track 2: the mock window -->
+  <div id="f01-the-move-layer-window" class="clip" data-start="0" data-duration="3.8" data-track-index="2">
+    <div class="f01-the-move-win-move" id="f01-the-move-win-move">
+      <div class="f01-the-move-win-card" id="f01-the-move-win-card">
+        <div class="f01-the-move-titlebar">
+          <div class="f01-the-move-lights"><i></i><i></i><i></i></div>
+          Notes
+        </div>
+        <div class="f01-the-move-side">
+          <div class="f01-the-move-line" style="width:96px"></div>
+          <div class="f01-the-move-line" style="width:120px"></div>
+          <div class="f01-the-move-line" style="width:72px"></div>
+          <div class="f01-the-move-line" style="width:108px"></div>
+          <div class="f01-the-move-line" style="width:84px"></div>
+          <div class="f01-the-move-line" style="width:116px"></div>
+        </div>
+        <div class="f01-the-move-main">
+          <div class="f01-the-move-line f01-the-move-line-t" style="width:236px"></div>
+          <div class="f01-the-move-line" style="width:92%"></div>
+          <div class="f01-the-move-line" style="width:84%"></div>
+          <div class="f01-the-move-line" style="width:95%"></div>
+          <div class="f01-the-move-line" style="width:68%"></div>
+          <div class="f01-the-move-line" style="width:88%"></div>
+          <div class="f01-the-move-line" style="width:76%"></div>
+          <div class="f01-the-move-line" style="width:52%"></div>
+        </div>
+      </div>
+      <div class="f01-the-move-win-ghost" id="f01-the-move-win-ghost"></div>
+    </div>
+  </div>
+
+  <!-- track 3: the 21-landmark hand constellation (lower-left) -->
+  <div id="f01-the-move-layer-hand" class="clip" data-start="0" data-duration="3.8" data-track-index="3">
+    <div class="f01-the-move-hand" id="f01-the-move-hand">
+      <svg viewBox="0 0 380 460" preserveAspectRatio="xMidYMid meet">
+        <g id="f01-the-move-hand-bones"></g>
+        <g id="f01-the-move-hand-dots"></g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- track 4: the teal pointer ring -->
+  <div id="f01-the-move-layer-ring" class="clip" data-start="0" data-duration="3.8" data-track-index="4">
+    <div class="f01-the-move-ring-pos" id="f01-the-move-ring-pos">
+      <div class="f01-the-move-ring-burst" id="f01-the-move-ring-burst"></div>
+      <div class="f01-the-move-ring-jit" id="f01-the-move-ring-jit">
+        <div class="f01-the-move-ring-core" id="f01-the-move-ring-core"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- track 5: kinetic type -->
+  <div id="f01-the-move-layer-type" class="clip" data-start="0" data-duration="3.8" data-track-index="5">
+    <div class="f01-the-move-type">
+      <div class="f01-the-move-h1" id="f01-the-move-p1">no mouse<span class="f01-the-move-dot">.</span></div>
+      <div class="f01-the-move-h1" id="f01-the-move-p2">no trackpad<span class="f01-the-move-dot">.</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<script>
+  (function () {
+    var ID = "01-the-move";
+    var D = 3.4;
+    var root = document.querySelector('[data-composition-id="' + ID + '"]');
+    var $ = function (id) { return root.querySelector("#" + "f" + ID + "-" + id); };
+
+    // ── geometry (px, 1920x1080) ────────────────────────────────────────
+    var THROW_DX = 700;                 // window: left-of-center → right-of-center
+    var RING_REST = { x: 560, y: 320 }; // over the window's title bar
+    var RING_P0 = { x: 1820, y: 1070 }; // enters from the lower-right
+    var RING_C = { x: 1300, y: 300 };   // bezier control: rise, then glide left onto the bar
+    var HAND_FRAC = 0.12;               // the hand mirrors the ring at a fraction of the amplitude
+
+    // ── hand constellation: 21 landmarks, open palm → pinch ─────────────
+    var OPEN = [
+      [200, 420],
+      [150, 390], [110, 350], [80, 310], [58, 275],      // thumb
+      [150, 300], [138, 235], [132, 190], [128, 150],    // index
+      [198, 290], [196, 215], [195, 165], [194, 120],    // middle
+      [243, 295], [250, 225], [253, 180], [256, 140],    // ring
+      [285, 310], [300, 255], [308, 220], [315, 188]     // little
+    ];
+    var PINCH = OPEN.map(function (p) { return p.slice(); });
+    PINCH[2] = [112, 340]; PINCH[3] = [92, 296]; PINCH[4] = [103, 240];   // thumb curls in
+    PINCH[6] = [140, 232]; PINCH[7] = [124, 212]; PINCH[8] = [105, 236];  // index tip meets it
+    var BONES = [
+      [0, 1], [1, 2], [2, 3], [3, 4],
+      [0, 5], [5, 6], [6, 7], [7, 8],
+      [5, 9], [9, 10], [10, 11], [11, 12],
+      [9, 13], [13, 14], [14, 15], [15, 16],
+      [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]
+    ];
+    var NS = "http://www.w3.org/2000/svg";
+    var bonesG = $("hand-bones"), dotsG = $("hand-dots");
+    var lines = BONES.map(function () {
+      var l = document.createElementNS(NS, "line");
+      bonesG.appendChild(l);
+      return l;
+    });
+    var dots = OPEN.map(function (_, i) {
+      var c = document.createElementNS(NS, "circle");
+      c.setAttribute("r", i === 4 || i === 8 ? 7.4 : i === 0 ? 6.75 : 5.4);
+      dotsG.appendChild(c);
+      return c;
+    });
+    function renderHand(p) {
+      var pts = OPEN.map(function (o, i) {
+        var q = PINCH[i];
+        return [o[0] + (q[0] - o[0]) * p, o[1] + (q[1] - o[1]) * p];
+      });
+      for (var i = 0; i < dots.length; i++) {
+        dots[i].setAttribute("cx", pts[i][0].toFixed(2));
+        dots[i].setAttribute("cy", pts[i][1].toFixed(2));
+      }
+      // the two meeting tips brighten as they close
+      var tip = p > 0.5 ? "#9eeaf3" : "#33bfd4";
+      dots[4].setAttribute("fill", tip);
+      dots[8].setAttribute("fill", tip);
+      for (var b = 0; b < BONES.length; b++) {
+        var a = pts[BONES[b][0]], z = pts[BONES[b][1]];
+        lines[b].setAttribute("x1", a[0].toFixed(2));
+        lines[b].setAttribute("y1", a[1].toFixed(2));
+        lines[b].setAttribute("x2", z[0].toFixed(2));
+        lines[b].setAttribute("y2", z[1].toFixed(2));
+      }
+    }
+    var pinch = { p: 0 };
+    renderHand(0);
+
+    // ── ring entrance arc (quadratic bezier, decelerating) ──────────────
+    var ringPos = $("ring-pos");
+    function ringAt(t) {
+      var u = 1 - t;
+      var x = u * u * RING_P0.x + 2 * u * t * RING_C.x + t * t * RING_REST.x;
+      var y = u * u * RING_P0.y + 2 * u * t * RING_C.y + t * t * RING_REST.y;
+      gsap.set(ringPos, { x: x, y: y });
+    }
+    var enter = { t: 0 };
+    ringAt(0);
+
+    // ── directional blur on the thrown window (x-only gaussian) ─────────
+    var winMove = $("win-move");
+    var blurFe = $("mblur-fe");
+    var blur = { sd: 0 };
+    function applyBlur() {
+      var sd = blur.sd;
+      blurFe.setAttribute("stdDeviation", sd.toFixed(2) + " 0");
+      winMove.style.filter = sd > 0.15 ? "url(#f" + ID + "-mblur)" : "none";
+    }
+
+    // ── shared visual states ────────────────────────────────────────────
+    var RING_REST_SHADOW = "0 0 18px rgba(51,191,212,0.5), 0 0 2px rgba(51,191,212,0.9)";
+    var RING_HOT_SHADOW = "0 0 34px rgba(51,191,212,0.95), 0 0 5px rgba(158,234,243,1)";
+    var WIN_REST_SHADOW = "0 20px 50px rgba(0,0,0,0.45)";
+    var WIN_LIFT_SHADOW = "0 40px 90px rgba(0,0,0,0.62)";
+
+    // ── timeline ────────────────────────────────────────────────────────
+    var tl = gsap.timeline({ paused: true });
+    var ringCore = $("ring-core");
+    var ringJit = $("ring-jit");
+
+    // Scene 1 (0.0–0.5): ground + window + glow already resting. Nothing moves.
+
+    // Scene 2 (0.5–1.3): ring sweeps in from the lower-right on a decelerating arc;
+    // the hand fades up lower-left, mirroring the path at a fraction of the amplitude.
+    tl.fromTo(ringPos, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power1.out" }, 0.5);
+    tl.fromTo(
+      enter,
+      { t: 0 },
+      { t: 1, duration: 0.8, ease: "expo.out", onUpdate: function () { ringAt(enter.t); } },
+      0.5
+    );
+    var hand = $("hand");
+    tl.fromTo(
+      hand,
+      { x: (RING_P0.x - RING_REST.x) * HAND_FRAC, y: (RING_P0.y - RING_REST.y) * HAND_FRAC },
+      { x: 0, y: 0, duration: 0.8, ease: "expo.out" },
+      0.5
+    );
+    tl.fromTo(hand, { opacity: 0 }, { opacity: 0.95, duration: 0.5, ease: "power2.out" }, 0.6);
+
+    // Scene 3 (1.3–1.5): PINCH — press-release-spring, press phase (linear-ish compression).
+    // Thumb + index tips close; ring shrinks to 65% and brightens; window gets the teal ghost + lifts.
+    var PRESS_START = 1.3, PRESS_DUR = 0.15;
+    tl.fromTo(
+      pinch,
+      { p: 0 },
+      { p: 1, duration: PRESS_DUR, ease: "power1.in", immediateRender: false, onUpdate: function () { renderHand(pinch.p); } },
+      PRESS_START
+    );
+    tl.fromTo(
+      ringCore,
+      { scale: 1, borderColor: "#33bfd4", boxShadow: RING_REST_SHADOW },
+      { scale: 0.65, borderColor: "#a9eef6", boxShadow: RING_HOT_SHADOW, duration: PRESS_DUR, ease: "power1.in" },
+      PRESS_START
+    );
+    var winCard = $("win-card");
+    tl.fromTo(
+      winCard,
+      { scale: 1, boxShadow: WIN_REST_SHADOW },
+      { scale: 1.03, boxShadow: WIN_LIFT_SHADOW, duration: 0.2, ease: "power2.out" },
+      PRESS_START
+    );
+    var ghost = $("win-ghost");
+    tl.fromTo(ghost, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: "power2.out" }, PRESS_START);
+
+    // Scene 4 (1.5–2.3): THE THROW — ring + window + glow travel together on one long expo arc,
+    // a brief x-only blur during the fastest ~200ms, then the ring releases and the ghost fades.
+    var THROW_START = 1.5, THROW_DUR = 0.8;
+    tl.fromTo(winMove, { x: 0 }, { x: THROW_DX, duration: THROW_DUR, ease: "expo.out" }, THROW_START);
+    tl.fromTo($("glow"), { x: 0 }, { x: THROW_DX, duration: THROW_DUR, ease: "expo.out" }, THROW_START);
+    tl.fromTo(
+      ringPos,
+      { x: RING_REST.x },
+      { x: RING_REST.x + THROW_DX, duration: THROW_DUR, ease: "expo.out", immediateRender: false },
+      THROW_START
+    );
+    tl.fromTo(
+      hand,
+      { x: 0 },
+      { x: THROW_DX * HAND_FRAC, duration: THROW_DUR, ease: "expo.out", immediateRender: false },
+      THROW_START
+    );
+    tl.fromTo(
+      blur,
+      { sd: 0 },
+      { sd: 16, duration: 0.07, ease: "power2.out", immediateRender: false, onUpdate: applyBlur },
+      THROW_START
+    );
+    tl.fromTo(
+      blur,
+      { sd: 16 },
+      { sd: 0, duration: 0.2, ease: "power2.in", immediateRender: false, onUpdate: applyBlur },
+      THROW_START + 0.07
+    );
+
+    // release (spring-back, smooth, no bounce) as the window lands
+    var RELEASE_START = 2.15;
+    tl.fromTo(
+      ringCore,
+      { scale: 0.65, borderColor: "#a9eef6", boxShadow: RING_HOT_SHADOW },
+      { scale: 1, borderColor: "#33bfd4", boxShadow: RING_REST_SHADOW, duration: 0.45, ease: "power3.out", immediateRender: false },
+      RELEASE_START
+    );
+    tl.fromTo(
+      $("ring-burst"),
+      { scale: 0.6, opacity: 0.45 },
+      { scale: 2.8, opacity: 0, duration: 0.5, ease: "power2.out" },
+      RELEASE_START
+    );
+    tl.fromTo(
+      ghost,
+      { opacity: 1 },
+      { opacity: 0, duration: 0.3, ease: "power2.out", immediateRender: false },
+      RELEASE_START + 0.1
+    );
+    tl.fromTo(
+      winCard,
+      { scale: 1.03, boxShadow: WIN_LIFT_SHADOW },
+      { scale: 1, boxShadow: WIN_REST_SHADOW, duration: 0.35, ease: "power2.out", immediateRender: false },
+      RELEASE_START + 0.1
+    );
+    tl.fromTo(
+      pinch,
+      { p: 1 },
+      { p: 0, duration: 0.35, ease: "power2.out", immediateRender: false, onUpdate: function () { renderHand(pinch.p); } },
+      RELEASE_START + 0.1
+    );
+    // ambient-glow-bloom, pulse-on-arrival: one breath past peak as the window lands, then settle.
+    tl.fromTo($("glow"), { opacity: 0.28 }, { opacity: 0.36, duration: 0.25, ease: "power2.out" }, 2.2);
+    tl.fromTo(
+      $("glow"),
+      { opacity: 0.36 },
+      { opacity: 0.28, duration: 0.5, ease: "power2.inOut", immediateRender: false },
+      2.45
+    );
+
+    // Scene 5 (2.3–3.4): kinetic-beat-slam — one beat grid, distinct entrances, no overshoot.
+    var PULSE = 0.5;
+    var BEATS = [2.3, 2.3 + PULSE];
+    tl.fromTo(
+      $("p1"),
+      { scale: 1.5, filter: "blur(16px)", opacity: 0 },
+      { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.45, ease: "power4.out" },
+      BEATS[0]
+    );
+    tl.fromTo(
+      $("p2"),
+      { x: -260, opacity: 0 },
+      { x: 0, opacity: 1, duration: 0.4, ease: "expo.out" },
+      BEATS[1]
+    );
+
+    // Hold (3.0–3.4): the ring idles with the faintest positional jitter — finite, bounded.
+    var jit = { ph: 0 };
+    tl.fromTo(
+      jit,
+      { ph: 0 },
+      {
+        ph: 1,
+        duration: D - 2.7,
+        ease: "none",
+        immediateRender: false,
+        onUpdate: function () {
+          var a = jit.ph * Math.PI * 2;
+          gsap.set(ringJit, {
+            x: 1.3 * Math.sin(a * 1.3),
+            y: 0.9 * Math.sin(a * 2.1 + 1.0)
+          });
+        }
+      },
+      2.7
+    );
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines[ID] = tl;
+  })();
+</script>
+</template>
