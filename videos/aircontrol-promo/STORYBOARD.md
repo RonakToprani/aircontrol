@@ -5,7 +5,7 @@ message: "Your Mac, controlled by a wave of your hand."
 arc: Demo Loop — hook (the magic move) → promise → gesture cycle ×5 → trust → brand
 audience: Mac users who love new tech — indie devs, designers, the X / TikTok / Product Hunt crowd
 mode: autonomous
-music: confident minimal electronic tech build, dark and clean, steady pulse around 100 BPM, rising energy, no vocals
+music: Minimal Techno 01 (Mixkit, Alejandro Magaña) — assets/bgm-minimal-techno-01.mp3, ~129 BPM tech house, cut to 26.3s; see ATTRIBUTION.md
 ---
 
 ## Video direction
