@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AirControl — control your Mac with a wave of your hand</title>
+<meta name="description" content="AirControl turns your MacBook's camera into a touchless controller: point, pinch, scroll, and dictate with hand gestures in the air. 100% on-device — your camera feed never leaves your Mac.">
+<meta property="og:title" content="AirControl — control your Mac with a wave of your hand">
+<meta property="og:description" content="Point, pinch, scroll, and dictate with in-air hand gestures through the webcam. Everything runs on your Mac; nothing is recorded or sent anywhere.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g stroke="%2333bfd4" stroke-width="2.4" fill="none" opacity="0.9"><path d="M32 58 24 44M32 58 40 44M24 44 40 44M24 44 14 42 8 34M24 44 22 28 20 16M28 43 30 24 30 10M40 44 38 26 40 13M40 44 46 32 50 22"/></g><g fill="%2333bfd4"><circle cx="32" cy="58" r="3"/><circle cx="24" cy="44" r="3"/><circle cx="40" cy="44" r="3"/><circle cx="14" cy="42" r="3"/><circle cx="8" cy="34" r="3.6"/><circle cx="22" cy="28" r="3"/><circle cx="20" cy="16" r="3.6"/><circle cx="30" cy="24" r="3"/><circle cx="30" cy="10" r="3.6"/><circle cx="38" cy="26" r="3"/><circle cx="40" cy="13" r="3.6"/><circle cx="46" cy="32" r="3"/><circle cx="50" cy="22" r="3.6"/></g></svg>'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --surface: #10151d;
+    --surface-2: #151b25;
+    --border: #232c3a;
+    --text: #f2f5f9;
+    --muted: #8b94a7;
+    --accent: #33bfd4;
+    --accent-soft: rgba(51, 191, 212, 0.12);
+    --accent-line: rgba(51, 191, 212, 0.35);
+    --radius: 14px;
+    --max: 1080px;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px;
+  }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- hero ---------- */
+  header { padding: 72px 0 40px; text-align: center; position: relative; overflow: hidden; }
+  header::before {
+    content: "";
+    position: absolute; inset: -40% -20% auto;
+    height: 90%;
+    background: radial-gradient(ellipse at 50% 0%, rgba(51,191,212,0.10), transparent 65%);
+    pointer-events: none;
+  }
+  .hero-grid { display: grid; gap: 56px; align-items: center; position: relative; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; color: var(--accent);
+    background: var(--accent-soft); border: 1px solid var(--accent-line);
+    padding: 5px 14px; border-radius: 999px; margin-bottom: 26px;
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 8px var(--accent); }
+  h1 {
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    font-weight: 800; letter-spacing: -0.03em; line-height: 1.08;
+    max-width: 17ch; margin: 0 auto 20px;
+  }
+  h1 em { font-style: normal; color: var(--accent); }
+  .sub {
+    color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.2rem);
+    max-width: 54ch; margin: 0 auto 36px;
+  }
+  .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 16px; cursor: pointer;
+    border-radius: 12px; padding: 14px 26px; border: 1px solid transparent;
+    transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .btn-primary {
+    background: var(--accent); color: #04252b;
+    box-shadow: 0 8px 30px rgba(51,191,212,0.25);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 36px rgba(51,191,212,0.35); text-decoration: none; }
+  .btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--surface-2); text-decoration: none; }
+  .fine { color: var(--muted); font-size: 13.5px; }
+  .fine strong { color: var(--text); font-weight: 600; }
+
+  /* ---------- animated demo panel ---------- */
+  .demo {
+    margin: 56px auto 0; width: 100%; max-width: 540px; position: relative;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    height: 360px; overflow: hidden;
+  }
+  .demo .titlebar {
+    height: 34px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 7px; padding: 0 14px;
+  }
+  .demo .titlebar span { width: 11px; height: 11px; border-radius: 50%; background: #2a3342; }
+  .demo .caption {
+    position: absolute; right: 14px; top: 44px; font-size: 12px; color: var(--muted);
+    background: rgba(10,14,20,0.6); padding: 3px 10px; border-radius: 999px;
+    border: 1px solid var(--border);
+  }
+  .mockwin {
+    position: absolute; left: 26px; top: 74px; width: 180px; height: 104px;
+    background: rgba(21,27,37,0.94); border: 1.5px solid var(--border); border-radius: 10px;
+    animation: drag 7s ease-in-out infinite; z-index: 2;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.35);
+  }
+  .mockwin .bar { height: 24px; border-bottom: 1px solid var(--border);
+    background: var(--accent-soft); border-radius: 9px 9px 0 0; }
+  .mockwin .line { height: 8px; margin: 10px 12px 0; border-radius: 4px; background: #222b39; }
+  .mockwin .line.short { width: 55%; }
+  .scrollwin {
+    position: absolute; right: 20px; bottom: 22px; width: 185px; height: 150px;
+    background: rgba(21,27,37,0.9); border: 1.5px solid var(--border); border-radius: 10px;
+    overflow: hidden; z-index: 1;
+  }
+  .scrollwin .bar {
+    height: 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 10px;
+    font-size: 10.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em;
+  }
+  .scrollwin .rows { position: absolute; inset: 24px 0 0; overflow: hidden; }
+  .scrollwin .rowset { padding: 12px 12px 0; animation: rows 5.5s linear infinite; }
+  .scrollwin .row { height: 10px; border-radius: 5px; background: #222b39; margin-bottom: 12px; }
+  .scrollwin .row.w1 { width: 88%; }
+  .scrollwin .row.w2 { width: 58%; background: #1d2634; }
+  .scrollwin .row.w3 { width: 74%; }
+  @keyframes rows { to { transform: translateY(-66px); } }
+  .ring {
+    position: absolute; left: 30px; top: 284px; width: 38px; height: 38px;
+    border: 2.5px solid var(--accent); border-radius: 50%;
+    background: rgba(51,191,212,0.10);
+    box-shadow: 0 0 18px rgba(51,191,212,0.45);
+    animation: glide 7s ease-in-out infinite; z-index: 3;
+  }
+  .ring::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px;
+    transform: translate(-50%, -50%); border-radius: 50%; background: #fff;
+  }
+  @keyframes glide {
+    0%   { transform: translate(0, 0) scale(1); }
+    22%  { transform: translate(68px, -200px) scale(1); }
+    30%  { transform: translate(72px, -206px) scale(0.72); }   /* pinch */
+    55%  { transform: translate(192px, -170px) scale(0.72); }  /* drag */
+    63%  { transform: translate(192px, -170px) scale(1); }     /* release */
+    82%  { transform: translate(110px, -44px) scale(1); }
+    100% { transform: translate(0, 0) scale(1); }
+  }
+  @keyframes drag {
+    0%, 30%   { transform: translate(0, 0); }
+    55%, 100% { transform: translate(120px, 36px); }
+    /* window follows the pinch, then stays put */
+  }
+
+  /* ---------- sections ---------- */
+  section { padding: 88px 0 0; position: relative; }
+  .kicker {
+    color: var(--accent); font-size: 13px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 12px;
+  }
+  h2 { font-size: clamp(1.7rem, 3.4vw, 2.3rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; }
+  .lead { color: var(--muted); max-width: 60ch; }
+  .lead + .lead { margin-top: 14px; }
+
+  /* gestures */
+  .gestures { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; margin-top: 40px; }
+  .gesture {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px;
+    transition: border-color 200ms ease, transform 200ms ease;
+  }
+  .gesture:hover { border-color: var(--accent-line); transform: translateY(-2px); }
+  .glyph {
+    font-size: 30px; width: 56px; height: 56px; flex: none;
+    display: grid; place-items: center;
+    background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: 14px;
+  }
+  .glyph.rot { transform: rotate(90deg); }
+  .gesture h3 { font-size: 15.5px; font-weight: 700; }
+  .gesture p { font-size: 13.5px; color: var(--muted); }
+
+  /* how it works — two-column split */
+  .split { display: grid; gap: 44px; align-items: start; }
+  .pipeline { list-style: none; margin-top: 8px; }
+  .pipeline li { display: flex; gap: 20px; position: relative; padding-bottom: 34px; }
+  .pipeline li:last-child { padding-bottom: 0; }
+  .pipeline li::before {
+    content: ""; position: absolute; left: 20px; top: 44px; bottom: 4px; width: 1px;
+    background: var(--border);
+  }
+  .pipeline li:last-child::before { display: none; }
+  .pipeline .node {
+    flex: none; width: 41px; height: 41px; border-radius: 12px;
+    display: grid; place-items: center;
+    background: var(--accent-soft); border: 1px solid var(--accent-line);
+    color: var(--accent); font: 700 12px var(--mono);
+  }
+  .pipeline .stage h3 { font-size: 16px; font-weight: 700; padding-top: 7px; }
+  .pipeline .stage p { font-size: 14px; color: var(--muted); margin-top: 5px; max-width: 48ch; }
+  .chip {
+    display: inline-block; margin: 8px 6px 0 0;
+    font: 500 11.5px/1 var(--mono); color: var(--accent);
+    background: var(--accent-soft); border: 1px solid var(--border);
+    padding: 5px 9px; border-radius: 6px; white-space: nowrap;
+  }
+
+  /* privacy */
+  .privacy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 40px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 26px;
+  }
+  .card svg { width: 26px; height: 26px; stroke: var(--accent); margin-bottom: 14px; }
+  .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--muted); }
+
+  /* install */
+  .install-box {
+    margin-top: 40px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .install-box .tab {
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .codebar {
+    display: flex; align-items: center; gap: 14px; padding: 20px 22px;
+    font-family: var(--mono);
+    font-size: 14px; overflow-x: auto; white-space: nowrap;
+  }
+  .codebar .prompt { color: var(--accent); flex: none; }
+  .codebar code { color: var(--text); }
+  .copy {
+    flex: none; margin-left: auto; cursor: pointer;
+    background: var(--surface-2); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 8px;
+    font: 600 12.5px "Inter", sans-serif; padding: 7px 14px;
+    transition: color 150ms ease, border-color 150ms ease;
+  }
+  .copy:hover { color: var(--text); border-color: var(--accent-line); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .install-alt { padding: 16px 22px; border-top: 1px solid var(--border); font-size: 13.5px; color: var(--muted); }
+
+  /* pricing */
+  .price-card {
+    margin: 40px auto 0; max-width: 460px; text-align: center;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--accent-line); border-radius: 18px; padding: 40px 34px;
+    box-shadow: 0 20px 60px rgba(51,191,212,0.07);
+  }
+  .price-card .now { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; }
+  .price-card .then { color: var(--muted); font-size: 14.5px; margin: 6px 0 24px; }
+  .price-card ul { list-style: none; text-align: left; margin: 0 auto 28px; max-width: 300px; }
+  .price-card li { padding: 7px 0 7px 30px; position: relative; font-size: 14.5px; color: var(--muted); }
+  .price-card li::before {
+    content: "✓"; position: absolute; left: 4px; color: var(--accent); font-weight: 700;
+  }
+
+  /* faq */
+  .faq { margin-top: 34px; max-width: 760px; }
+  details {
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); margin-bottom: 10px;
+  }
+  summary {
+    cursor: pointer; font-weight: 600; font-size: 15.5px;
+    padding: 18px 46px 18px 22px; list-style: none; position: relative;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: "+"; position: absolute; right: 20px; top: 50%;
+    transform: translateY(-50%); color: var(--accent); font-size: 20px; font-weight: 500;
+  }
+  details[open] summary::after { content: "–"; }
+  details .a { padding: 0 22px 20px; color: var(--muted); font-size: 14.5px; max-width: 66ch; }
+  details .a a { font-weight: 600; }
+
+  footer {
+    margin-top: 100px; border-top: 1px solid var(--border);
+    padding: 36px 0 48px; color: var(--muted); font-size: 13.5px;
+  }
+  .foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  /* ---------- background depth: landmark constellations + section glows ---------- */
+  .constellation {
+    display: none; position: absolute; pointer-events: none; z-index: 0;
+    user-select: none;
+  }
+  .constellation .lm-g { animation: lm-shimmer 11s ease-in-out infinite; }
+  .constellation .lm-b { animation-delay: -3.5s; }
+  .constellation .lm-c { animation-delay: -7s; }
+  @keyframes lm-shimmer {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+  .hand-hero { animation: hand-drift 26s ease-in-out infinite alternate; }
+  @keyframes hand-drift {
+    from { transform: rotate(9deg) translateY(0); }
+    to   { transform: rotate(9deg) translateY(-16px); }
+  }
+  #how::before {
+    content: ""; position: absolute; z-index: -1;
+    left: -12%; top: 4%; width: 64%; height: 92%;
+    background: radial-gradient(ellipse at 35% 45%, rgba(51,191,212,0.06), transparent 62%);
+    pointer-events: none;
+  }
+  #privacy::before {
+    content: ""; position: absolute; z-index: -1;
+    right: -18%; top: -6%; width: 62%; height: 100%;
+    background: radial-gradient(ellipse at 60% 40%, rgba(51,191,212,0.05), transparent 62%);
+    pointer-events: none;
+  }
+  #pricing::before {
+    content: ""; position: absolute; z-index: -1;
+    left: 18%; top: 6%; width: 64%; height: 110%;
+    background: radial-gradient(ellipse at 50% 45%, rgba(51,191,212,0.065), transparent 60%);
+    pointer-events: none;
+  }
+  @media (min-width: 1240px) {
+    .hand-hero {
+      display: block; right: -48px; top: -8px; width: 500px;
+    }
+  }
+  @media (min-width: 980px) {
+    .hand-faq {
+      display: block;
+      left: max(12px, calc((100% - var(--max)) / 2));
+      bottom: 24px; width: 270px;
+      transform: scaleX(-1) rotate(-8deg); opacity: 0.7;
+    }
+  }
+
+  /* ---------- margin devices (wide screens only) ---------- */
+  .rail, .marginalia { display: none; }
+  @media (min-width: 1200px) {
+    .rail {
+      display: flex; flex-direction: column; gap: 4px;
+      position: fixed; left: 22px; top: 50%; transform: translateY(-50%); z-index: 20;
+    }
+    .rail a {
+      display: flex; align-items: center; gap: 10px; padding: 5px 4px;
+      color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em;
+    }
+    .rail a:hover { text-decoration: none; color: var(--text); }
+    .rail a::before {
+      content: ""; flex: none; width: 16px; height: 2px; background: var(--border);
+      transition: background 180ms ease, width 180ms ease;
+    }
+    .rail a span { opacity: 0; transform: translateX(-4px); transition: opacity 160ms ease, transform 160ms ease; }
+    .rail a:hover span, .rail a:focus-visible span, .rail a.active span { opacity: 1; transform: none; }
+    .rail a.active { color: var(--text); }
+    .rail a.active::before { background: var(--accent); width: 24px; }
+    .marginalia {
+      display: block; position: absolute; right: 36px; top: 130px;
+      writing-mode: vertical-rl; font: 500 11px var(--mono);
+      letter-spacing: 0.14em; color: var(--muted); white-space: nowrap;
+    }
+    .marginalia::before {
+      content: ""; display: block; width: 1px; height: 44px;
+      background: var(--border); margin: 0 auto 14px;
+    }
+  }
+
+  /* ---------- responsive layout ---------- */
+  @media (min-width: 980px) {
+    header { text-align: left; padding: 96px 0 56px; }
+    .hero-grid { grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); }
+    h1 { margin: 0 0 20px; }
+    .sub { margin: 0 0 36px; }
+    .cta-row { justify-content: flex-start; }
+    .demo { margin: 0; max-width: none; }
+    .split-how { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 64px; }
+    .split-faq { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 64px; }
+    .split-faq .faq { margin-top: 0; }
+  }
+  @media (max-width: 560px) {
+    header { padding-top: 52px; }
+    .demo { height: 340px; }
+    .mockwin { left: 14px; top: 64px; width: 150px; height: 92px; }
+    .scrollwin { right: 12px; bottom: 16px; width: 150px; height: 130px; }
+    .ring { left: 20px; top: 262px; }
+    @keyframes glide {
+      0%   { transform: translate(0, 0) scale(1); }
+      22%  { transform: translate(48px, -190px) scale(1); }
+      30%  { transform: translate(52px, -194px) scale(0.72); }
+      55%  { transform: translate(122px, -158px) scale(0.72); }
+      63%  { transform: translate(122px, -158px) scale(1); }
+      82%  { transform: translate(70px, -30px) scale(1); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+    @keyframes drag {
+      0%, 30%   { transform: translate(0, 0); }
+      55%, 100% { transform: translate(70px, 36px); }
+    }
+  }
+</style>
+</head>
+<body>
+
+<nav class="rail" aria-label="Sections">
+  <a href="#gestures"><span>Gestures</span></a>
+  <a href="#how"><span>How it works</span></a>
+  <a href="#privacy"><span>Privacy</span></a>
+  <a href="#install"><span>Install</span></a>
+  <a href="#pricing"><span>Pricing</span></a>
+  <a href="#faq"><span>FAQ</span></a>
+</nav>
+
+<header>
+  <svg class="constellation hand-hero" viewBox="0 0 380 460" aria-hidden="true">
+    <g fill="none" stroke="rgba(51,191,212,0.085)" stroke-width="1">
+      <path d="M200 420 L150 390 L110 350 L80 310 L58 275"/>
+      <path d="M200 420 L150 300 L138 235 L132 190 L128 150"/>
+      <path d="M150 300 L198 290 L196 215 L195 165 L194 120"/>
+      <path d="M198 290 L243 295 L250 225 L253 180 L256 140"/>
+      <path d="M243 295 L285 310 L300 255 L308 220 L315 188"/>
+      <path d="M200 420 L285 310"/>
+    </g>
+    <g class="lm-g lm-a" fill="rgba(51,191,212,0.26)">
+      <circle cx="200" cy="420" r="5"/>
+      <circle cx="150" cy="390" r="3.5"/>
+      <circle cx="150" cy="300" r="3.5"/>
+      <circle cx="198" cy="290" r="3.5"/>
+      <circle cx="243" cy="295" r="3.5"/>
+      <circle cx="285" cy="310" r="3.5"/>
+    </g>
+    <g class="lm-g lm-b" fill="rgba(51,191,212,0.22)">
+      <circle cx="110" cy="350" r="3"/>
+      <circle cx="80" cy="310" r="3"/>
+      <circle cx="138" cy="235" r="3"/>
+      <circle cx="132" cy="190" r="3"/>
+      <circle cx="196" cy="215" r="3"/>
+      <circle cx="195" cy="165" r="3"/>
+      <circle cx="250" cy="225" r="3"/>
+      <circle cx="253" cy="180" r="3"/>
+      <circle cx="300" cy="255" r="3"/>
+      <circle cx="308" cy="220" r="3"/>
+    </g>
+    <g class="lm-g lm-c" fill="rgba(51,191,212,0.30)">
+      <circle cx="58" cy="275" r="3.5"/>
+      <circle cx="128" cy="150" r="3.5"/>
+      <circle cx="194" cy="120" r="3.5"/>
+      <circle cx="256" cy="140" r="3.5"/>
+      <circle cx="315" cy="188" r="3.5"/>
+    </g>
+  </svg>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <div class="badge"><span class="dot"></span> Free beta · macOS 14+</div>
+      <h1>Control your Mac with a <em>wave of your&nbsp;hand</em></h1>
+      <p class="sub">AirControl turns the camera into a touchless controller. Point with an open hand, pinch to click and drag windows, make a fist to scroll, speak instead of type — without touching a thing.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/RonakToprani/aircontrol/releases/latest">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for macOS
+        </a>
+        <a class="btn btn-ghost" href="#install">Install with one command</a>
+      </div>
+      <p class="fine">Works on any Mac with a camera · <strong>100% on-device</strong> — video never leaves your Mac</p>
+    </div>
+
+    <div class="demo" role="img" aria-label="Animation of AirControl's pointer ring pinching and dragging a window while a second practice window scrolls">
+      <div class="titlebar"><span></span><span></span><span></span></div>
+      <div class="caption">pinch · drag · release</div>
+      <div class="mockwin">
+        <div class="bar"></div>
+        <div class="line"></div>
+        <div class="line short"></div>
+      </div>
+      <div class="scrollwin">
+        <div class="bar">Scroll practice</div>
+        <div class="rows">
+          <div class="rowset">
+            <div class="row w1"></div>
+            <div class="row w2"></div>
+            <div class="row w3"></div>
+            <div class="row w1"></div>
+            <div class="row w2"></div>
+            <div class="row w3"></div>
+            <div class="row w1"></div>
+            <div class="row w2"></div>
+            <div class="row w3"></div>
+          </div>
+        </div>
+      </div>
+      <div class="ring"></div>
+    </div>
+  </div>
+</header>
+
+<section id="gestures">
+  <div class="marginalia" aria-hidden="true">point · pinch · scroll · speak</div>
+  <div class="wrap">
+    <p class="kicker">The whole language</p>
+    <h2>Seven gestures. That's the manual.</h2>
+    <p class="lead">Every gesture was tuned over months of daily use until it stopped misfiring — a closing fist never reads as a pinch, a wave never switches your desktop.</p>
+    <div class="gestures">
+      <div class="gesture"><div class="glyph">✋</div><div><h3>Open hand</h3><p>moves the cursor — smooth, precise, calibrated to your comfortable reach</p></div></div>
+      <div class="gesture"><div class="glyph">🤏</div><div><h3>Pinch</h3><p>click — hold to drag windows around your desktop</p></div></div>
+      <div class="gesture"><div class="glyph">✊</div><div><h3>Fist</h3><p>scroll like a trackpad, with clutch and coasting</p></div></div>
+      <div class="gesture"><div class="glyph">🤙</div><div><h3>Shaka, held</h3><p>mouse mode on / off — your hand drives the real cursor</p></div></div>
+      <div class="gesture"><div class="glyph">🎙️</div><div><h3>Pinch-hold a text box</h3><p>dictate on-device — release to type, 👍 to send</p></div></div>
+      <div class="gesture"><div class="glyph rot">👍</div><div><h3>Fist, thumb sideways</h3><p>switch desktops without touching the trackpad</p></div></div>
+      <div class="gesture"><div class="glyph">✌️</div><div><h3>Peace, held</h3><p>turns AirControl off — the camera goes dark instantly</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap split split-how">
+    <div>
+      <p class="kicker">Under the hood</p>
+      <h2>A straight line from camera to cursor</h2>
+      <p class="lead">No cloud, no ML server, no waiting on a network. Four stages run on your Mac, and the last one speaks the same language as your mouse — so every app responds the way it always has.</p>
+      <p class="lead">The filter stage is why the pointer feels calm instead of jittery: adaptive smoothing holds steady while you aim and gets out of the way the moment you move fast.</p>
+    </div>
+    <ol class="pipeline">
+      <li>
+        <span class="node" aria-hidden="true">01</span>
+        <div class="stage">
+          <h3>Camera frames</h3>
+          <p>The webcam's live feed, processed in memory and discarded frame by frame. Nothing is recorded, ever.</p>
+          <span class="chip">AVCaptureSession</span>
+        </div>
+      </li>
+      <li>
+        <span class="node" aria-hidden="true">02</span>
+        <div class="stage">
+          <h3>Hand landmarks, on-device</h3>
+          <p>Apple's Vision framework finds 21 joints on your hand in every frame — entirely on your Mac's own silicon.</p>
+          <span class="chip">VNDetectHumanHandPoseRequest</span>
+        </div>
+      </li>
+      <li>
+        <span class="node" aria-hidden="true">03</span>
+        <div class="stage">
+          <h3>1€ filter smoothing</h3>
+          <p>The One-Euro filter — a technique built for exactly this problem — kills jitter during precise moves without adding lag to fast ones.</p>
+          <span class="chip">OneEuroFilter</span>
+        </div>
+      </li>
+      <li>
+        <span class="node" aria-hidden="true">04</span>
+        <div class="stage">
+          <h3>Real clicks, real windows</h3>
+          <p>Gestures become the same events a physical mouse produces — clicks, scrolls, drags — plus window moves through the Accessibility API.</p>
+          <span class="chip">CGEvent</span><span class="chip">AXUIElement</span>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="marginalia" aria-hidden="true">0 bytes leave the machine</div>
+  <div class="wrap">
+    <p class="kicker">Private by architecture</p>
+    <h2>Your camera feed never leaves your Mac</h2>
+    <p class="lead">Not "we don't look at it" — it physically can't go anywhere.</p>
+    <div class="privacy-grid">
+      <div class="card">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <h3>Processed live, thrown away</h3>
+        <p>Frames go straight to Apple's on-device Vision framework and are discarded. Nothing is recorded, stored, or uploaded — ever.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>
+        <h3>No accounts, no telemetry</h3>
+        <p>No sign-up, no analytics, no crash reporters phoning home. The app's only network call is the update check you trigger yourself.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+        <h3>Off means off</h3>
+        <p>Disable it from the menu bar — or hold ✌️ at the camera — and the session stops on the spot. The menu-bar hand hollows out so you always know.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <p class="kicker">Install</p>
+    <h2>One command. No "Open Anyway" dance.</h2>
+    <p class="lead">The terminal installer skips Gatekeeper's quarantine entirely, verifies the download's checksum, and doubles as the updater — run it again any time to get the latest release.</p>
+    <div class="install-box">
+      <div class="tab"><span>Terminal — install or update</span><span>macOS 14 (Sonoma) or later</span></div>
+      <div class="codebar">
+        <span class="prompt" aria-hidden="true">$</span>
+        <code id="cmd">curl -fsSL https://raw.githubusercontent.com/RonakToprani/aircontrol/production/install.sh | sh</code>
+        <button class="copy" id="copyBtn" aria-label="Copy install command">Copy</button>
+      </div>
+      <div class="install-alt">
+        Prefer clicking? <a href="https://github.com/RonakToprani/aircontrol/releases/latest">Download the DMG</a> and drag AirControl to Applications (Gatekeeper will ask you to approve it once in System Settings). Homebrew tap coming soon.
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <p class="kicker">Pricing</p>
+    <h2 style="text-align:center">Free while in beta</h2>
+    <div class="price-card">
+      <div class="now">$0 <span style="font-size:17px; color:var(--muted); font-weight:600">today</span></div>
+      <p class="then">$8 one-time at 1.0 — beta users get a launch discount, no subscription, ever</p>
+      <ul>
+        <li>Use it on 2 Macs</li>
+        <li>All gestures, tuning, and updates</li>
+        <li>No account required</li>
+        <li>14-day no-questions refund at 1.0</li>
+      </ul>
+      <a class="btn btn-primary" href="https://github.com/RonakToprani/aircontrol/releases/latest" style="width:100%; justify-content:center">Get the beta</a>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <svg class="constellation hand-faq" viewBox="0 0 380 460" aria-hidden="true">
+    <g fill="none" stroke="rgba(51,191,212,0.075)" stroke-width="1">
+      <path d="M200 420 L150 390 L110 350 L80 310 L58 275"/>
+      <path d="M200 420 L150 300 L138 235 L132 190 L128 150"/>
+      <path d="M150 300 L198 290 L196 215 L195 165 L194 120"/>
+      <path d="M198 290 L243 295 L250 225 L253 180 L256 140"/>
+      <path d="M243 295 L285 310 L300 255 L308 220 L315 188"/>
+      <path d="M200 420 L285 310"/>
+    </g>
+    <g class="lm-g lm-b" fill="rgba(51,191,212,0.20)">
+      <circle cx="200" cy="420" r="5"/>
+      <circle cx="150" cy="390" r="3.5"/>
+      <circle cx="110" cy="350" r="3"/>
+      <circle cx="80" cy="310" r="3"/>
+      <circle cx="150" cy="300" r="3.5"/>
+      <circle cx="138" cy="235" r="3"/>
+      <circle cx="132" cy="190" r="3"/>
+      <circle cx="198" cy="290" r="3.5"/>
+      <circle cx="196" cy="215" r="3"/>
+      <circle cx="195" cy="165" r="3"/>
+      <circle cx="243" cy="295" r="3.5"/>
+      <circle cx="250" cy="225" r="3"/>
+      <circle cx="253" cy="180" r="3"/>
+      <circle cx="285" cy="310" r="3.5"/>
+      <circle cx="300" cy="255" r="3"/>
+      <circle cx="308" cy="220" r="3"/>
+    </g>
+    <g class="lm-g lm-c" fill="rgba(51,191,212,0.26)">
+      <circle cx="58" cy="275" r="3.5"/>
+      <circle cx="128" cy="150" r="3.5"/>
+      <circle cx="194" cy="120" r="3.5"/>
+      <circle cx="256" cy="140" r="3.5"/>
+      <circle cx="315" cy="188" r="3.5"/>
+    </g>
+  </svg>
+  <div class="wrap split split-faq">
+    <div>
+      <p class="kicker">Questions</p>
+      <h2>FAQ</h2>
+      <p class="lead">The honest answers, including the one about the App Store.</p>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Why isn't it on the App Store?</summary>
+        <div class="a">It can't be. AirControl moves your cursor and windows using macOS accessibility APIs, which the App Store sandbox forbids — the same reason tools like Rectangle and BetterTouchTool ship outside it. It's distributed directly, with checksums you can verify.</div>
+      </details>
+      <details>
+        <summary>What does it need to run?</summary>
+        <div class="a">macOS 14 (Sonoma) or later and any built-in or external camera. It asks for two permissions on first run: Camera (to see your hand) and Accessibility (to move windows and click for you). A two-minute welcome tour walks you through both, then lets you practice every gesture safely on fake windows before anything real is touched.</div>
+      </details>
+      <details>
+        <summary>Is it accurate enough to actually use?</summary>
+        <div class="a">That was the whole project. Deliberate hold-times, motion gates, and per-gesture thresholds mean gestures fire when you mean them and not when you don't — and every threshold is adjustable in the tuning panel if your hands disagree with the defaults. Calibration maps your comfortable range of motion to the whole desktop, so you never stretch.</div>
+      </details>
+      <details>
+        <summary>Who is this for?</summary>
+        <div class="a">People eating lunch at their desk. Presenters who want to drive slides from across the room. Anyone managing RSI who wants stretches of the day without gripping a mouse. And honestly — anyone who's ever wanted to move a window by grabbing it out of the air.</div>
+      </details>
+      <details>
+        <summary>Does it drain the battery?</summary>
+        <div class="a">When no hand is visible for a few minutes it drops into a low-power rest mode and the camera work nearly stops; showing your hand wakes it instantly. You can tune the idle timeout, or just turn it off from the menu bar when you're done.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span>Made by <a href="https://github.com/RonakToprani">Ronak Toprani</a> · AirControl</span>
+    <span><a href="https://github.com/RonakToprani/aircontrol/releases/latest">Releases</a> · <a href="https://github.com/RonakToprani/aircontrol/issues">Support</a></span>
+  </div>
+</footer>
+
+<script>
+  const btn = document.getElementById("copyBtn");
+  btn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(document.getElementById("cmd").textContent);
+      btn.textContent = "Copied ✓";
+    } catch {
+      btn.textContent = "Select & copy";
+    }
+    setTimeout(() => { btn.textContent = "Copy"; }, 1800);
+  });
+
+  // section-index rail: highlight the section in view (wide screens only)
+  const railLinks = [...document.querySelectorAll(".rail a")];
+  if (railLinks.length && "IntersectionObserver" in window) {
+    const byId = new Map(railLinks.map(a => [a.hash.slice(1), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        railLinks.forEach(a => a.classList.remove("active"));
+        const link = byId.get(e.target.id);
+        if (link) link.classList.add("active");
+      }
+    }, { rootMargin: "-35% 0px -55% 0px" });
+    document.querySelectorAll("section[id]").forEach(s => spy.observe(s));
+  }
+</script>
+
+</body>
+</html>

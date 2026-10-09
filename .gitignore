@@ -19,3 +19,6 @@ build/
 *.xcuserstate
 xcuserdata/
 .build/
+
+# Vercel (site deploy project link)
+site/.vercel
