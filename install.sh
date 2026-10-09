@@ -1,7 +1,7 @@
 #!/bin/bash
 # AirControl one-line installer / updater.
 #
-#   curl -fsSL https://raw.githubusercontent.com/RonakToprani/aircontrol/production/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/RonakToprani/aircontrol/main/install.sh | sh
 #
 # Downloads the latest release DMG, verifies its checksum when one is
 # published, installs to /Applications, and strips the quarantine flag a
@@ -54,7 +54,7 @@ sums_url=$(printf '%s' "$release_json" \
 if [ -z "$dmg_url" ]; then
   # API unreachable/rate-limited: derive the release URL from the published
   # VERSION file so the fallback tracks releases; the pinned URL is last resort.
-  ver=$(curl -fsSL "https://raw.githubusercontent.com/$REPO/production/VERSION" 2>/dev/null | tr -d '[:space:]' || true)
+  ver=$(curl -fsSL "https://raw.githubusercontent.com/$REPO/main/VERSION" 2>/dev/null | tr -d '[:space:]' || true)
   if [ -n "$ver" ]; then
     warn "Couldn't query GitHub for the latest release — using version $ver from the repo."
     dmg_url="https://github.com/$REPO/releases/download/v$ver/AirControl-$ver.dmg"
