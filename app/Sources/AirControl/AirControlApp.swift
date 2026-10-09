@@ -1,7 +1,19 @@
 import SwiftUI
 
+/// Quit safety: a MenuBarExtra app has no window whose close we could hook,
+/// so this is the only spot that guarantees a quit mid-pinch doesn't strand
+/// a synthetic mouse button DOWN or leave the system cursor hidden — both
+/// outlive the process (the cursor is hidden via a CGS connection property).
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        AppState.shared.prepareForTermination()
+    }
+}
+
 @main
 struct AirControlApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var state = AppState.shared
     @StateObject private var config = AppState.shared.configStore
 
@@ -10,7 +22,11 @@ struct AirControlApp: App {
             Toggle("Enable AirControl", isOn: $state.enabled)
             Text(state.statusLine)
             if state.needsAccessibility {
-                Text("⚠︎ Needs Accessibility permission")
+                // A warning you can't act on is a dead end — clicking jumps
+                // straight to the pane where the checkbox lives.
+                Button("⚠︎ Grant Accessibility permission…") {
+                    SpaceSwitcher.openSystemSettings()
+                }
             }
             Divider()
             Toggle("Mouse mode — pinch to click", isOn: $config.config.mouseMode)

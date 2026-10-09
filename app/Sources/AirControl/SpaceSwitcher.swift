@@ -8,6 +8,29 @@ import CoreGraphics
 enum SpaceSwitcher {
     static var isTrusted: Bool { AXIsProcessTrusted() }
 
+    /// Whether Mission Control's "Move left/right a space" shortcuts (⌃←/⌃→)
+    /// are active. If the user disabled them in System Settings → Keyboard →
+    /// Keyboard Shortcuts → Mission Control, the events post() sends vanish
+    /// silently — this lets the UI warn instead of letting swipes dead-end.
+    ///
+    /// Symbolic hotkey IDs 79/81 = move left/right a space. A MISSING entry
+    /// means the factory default, which is ENABLED — so anything absent or
+    /// unreadable reports true; only an explicit enabled=false counts as off.
+    static var missionControlShortcutsEnabled: Bool {
+        guard let prefs = UserDefaults(suiteName: "com.apple.symbolichotkeys"),
+              let hotkeys = prefs.dictionary(forKey: "AppleSymbolicHotKeys") else {
+            return true // domain unreadable — never false-alarm
+        }
+        for id in ["79", "81"] {
+            if let entry = hotkeys[id] as? [String: Any],
+               let enabled = entry["enabled"] as? NSNumber,
+               !enabled.boolValue {
+                return false
+            }
+        }
+        return true
+    }
+
     /// Shows the system Accessibility prompt once if not yet trusted.
     @discardableResult
     static func requestTrust() -> Bool {

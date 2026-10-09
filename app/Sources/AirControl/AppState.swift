@@ -39,16 +39,26 @@ final class AppState: ObservableObject {
     /// user's real values throughout.
     @Published var practiceSandbox = false
 
+    /// True for the tour's ENTIRE lifetime, not just the practice step: the
+    /// hand goes live at "raise your hand" (camera step), and nothing real
+    /// may be grabbed, clicked, scrolled, typed, or switched until the tour
+    /// closes — practice merely ADDS the mock windows on top of this.
+    @Published var tourOpen = false
+
     /// The config the engine and overlay actually run on: the stored config,
-    /// with the practice sandbox forced on top while the tour is practicing —
-    /// mock windows on, Space switching off, and the taught gestures (🤙,
+    /// with the tour sandbox forced on top while the welcome tour is open
+    /// (no real-world effects tour-wide), and the practice extras on top of
+    /// that while practicing — mock windows on, and the taught gestures (🤙,
     /// thumb pose) enabled so every drill is performable even if the user
     /// disabled them in tuning.
     var effectiveConfig: Config {
         var c = configStore.config
+        if tourOpen {
+            c.tourSandbox = true
+            c.switchSpaces = false
+        }
         if practiceSandbox {
             c.useMockWindows = true
-            c.switchSpaces = false
             c.shakaToggle = true
             c.thumbSwitch = true
         }
@@ -226,6 +236,15 @@ final class AppState: ObservableObject {
         overlay.show()
     }
 
+    /// Quit-time cleanup, called from applicationWillTerminate. The teardown
+    /// path already releases a held synthetic mouse button and unhides the
+    /// system cursor (via OverlayController.close → prepareForClose) — both
+    /// would otherwise outlive the process. Safe while disabled: overlay is
+    /// nil and every step is a no-op.
+    func prepareForTermination() {
+        teardownSession()
+    }
+
     /// Stops the camera and tears down the overlay without changing `enabled`
     /// — the shared path for sleep and for a full stop.
     private func teardownSession() {
@@ -257,7 +276,13 @@ final class AppState: ObservableObject {
                                                 now: CACurrentMediaTime())
                 // Toggle BEFORE the overlay sees the event, so its MOUSE
                 // ON/OFF flash reads the mode it just switched into.
-                if state.shakaEvent, self.calStage == .idle {
+                // Suppressed while the tour is open but NOT practicing (and
+                // through the post-close countdown): a misread 1.1s shaka at
+                // the "raise your hand" step would silently flip the STORED
+                // mouse mode and leave the user live in it after the tour —
+                // the drill still works, practice allows it explicitly.
+                let shakaAllowed = !self.tourOpen || self.practiceSandbox
+                if state.shakaEvent, self.calStage == .idle, shakaAllowed {
                     self.configStore.config.mouseMode.toggle()
                 }
                 if self.calStage != .idle {
@@ -336,14 +361,75 @@ final class AppState: ObservableObject {
     /// The welcome tour — auto-shown on first launch, reopenable from the
     /// menu. One instance at a time; re-invoking brings it to front.
     func showOnboarding() {
+        // (Re)opening the tour cancels any hand-over in flight: stale
+        // countdown timers must not fire under the new tour session.
+        tourHandoffGeneration += 1
+        pendingTourHandoff = false
         if let o = onboarding {
             o.show()
             return
         }
         let o = OnboardingController()
-        o.onClose = { [weak self] in self?.onboarding = nil }
+        o.onClose = { [weak self] in
+            guard let self else { return }
+            self.onboarding = nil
+            // Closing the tour must not hand the hand control mid-gesture.
+            // Second safety level: the sandbox STAYS ON through a visible
+            // 3-2-1 countdown on the HUD, and only then goes live — time to
+            // lower your hand, no surprise cursor. (Instant when the app is
+            // off: nothing is live anyway.)
+            guard self.enabled else {
+                self.tourOpen = false
+                return
+            }
+            if self.calStage != .idle {
+                // Closed mid-calibration: the hand is up by definition (they
+                // are pinch-holding corners). Hold the sandbox; the countdown
+                // runs when calibration ends (endCalibration consumes this).
+                self.pendingTourHandoff = true
+                return
+            }
+            self.beginTourHandoffCountdown()
+        }
         onboarding = o
+        tourOpen = true
         o.show()
+    }
+
+    // MARK: tour hand-over
+
+    /// Deferred hand-over: the tour was closed mid-calibration, so the
+    /// countdown waits for the calibration to finish first.
+    private var pendingTourHandoff = false
+    /// Invalidates in-flight countdown timers on every reopen/close cycle —
+    /// an uncancelled timer from a PREVIOUS close must never lift the
+    /// sandbox while a newer countdown is still promising time.
+    private var tourHandoffGeneration = 0
+
+    private func beginTourHandoffCountdown() {
+        tourHandoffGeneration += 1
+        let gen = tourHandoffGeneration
+        for i in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i)) { [weak self] in
+                guard let self, self.tourHandoffGeneration == gen,
+                      self.onboarding == nil else { return } // stale or reopened
+                // Never stomp calibration's own instructions.
+                if self.calStage == .idle {
+                    self.overlay?.setPrompt("Hand control in \(3 - i)… lower your hand if not ready")
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, self.tourHandoffGeneration == gen,
+                  self.onboarding == nil else { return }
+            self.tourOpen = false // the sandbox lifts exactly here
+            guard self.calStage == .idle else { return } // prompt only
+            let msg = "You're live — open ✋ moves the cursor"
+            self.overlay?.setPrompt(msg)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+                self?.overlay?.clearPrompt(ifMatches: msg)
+            }
+        }
     }
 
     func startCalibration() {
@@ -367,11 +453,20 @@ final class AppState: ObservableObject {
     private func endCalibration(message: String?) {
         calStage = .idle
         preview?.setCalibration(nil)
+        // The tour was closed mid-calibration: its hand-over countdown was
+        // deferred to here — hands were up for the corner pinches, so the
+        // 3-2-1 grace matters MORE now, not less.
+        if pendingTourHandoff, onboarding == nil {
+            pendingTourHandoff = false
+            beginTourHandoffCountdown()
+        }
         overlay?.setPrompt(message)
         let closePreview = !calPrevShowPreview
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
             guard let self, self.calStage == .idle else { return }
-            self.overlay?.setPrompt(nil)
+            // Clear only OUR message — a blanket nil here could wipe a prompt
+            // some later flow (e.g. the tour's hand-over line) has put up.
+            if let message { self.overlay?.clearPrompt(ifMatches: message) }
             if closePreview, self.showPreview { self.showPreview = false }
         }
     }
@@ -442,6 +537,13 @@ final class AppState: ObservableObject {
         cameraInterrupted = false
         tracker.onFrame = nil
         teardownSession() // also cancels pending screen-change / wake work
+        // Disabling with the tour already closed must not strand the tour
+        // sandbox (a deferred or in-flight hand-over countdown would leave
+        // tourOpen true forever — gestures visual-only, app looks broken).
+        if onboarding == nil {
+            tourOpen = false
+            pendingTourHandoff = false
+        }
     }
 
     /// The preview panel exists only while enabled AND requested — the camera

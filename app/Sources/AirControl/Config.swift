@@ -50,6 +50,12 @@ struct Config: Codable, Equatable {
 
     // Real windows (M3)
     var useMockWindows: Bool = false     // practice on mock windows instead of real ones
+    // Runtime-only, forced by AppState.effectiveConfig while the welcome tour
+    // is open — never true in the STORED config (the tour overlays it, it
+    // doesn't write it), so the value on disk is always false. Suppresses
+    // every real-world effect tour-wide: real-window grabs, clicks, scrolls,
+    // Return, Space switches.
+    var tourSandbox: Bool = false
     var raiseOnGrab: Bool = true         // grabbing a window brings it to front, like a mouse click
     var axWriteMinIntervalMS: Double = 16 // floor between AX position writes; latency adapts above it
     var stickyHoverPx: Double = 16       // pointer must exit target frame by this before retargeting

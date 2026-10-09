@@ -88,6 +88,13 @@ final class OverlayController {
 
     /// Overrides the status line (calibration instructions etc.); nil clears.
     func setPrompt(_ text: String?) { view.prompt = text }
+
+    /// Clears the prompt only if it still shows `text` — an old timer must
+    /// never wipe a prompt some later flow (calibration, another notice)
+    /// has since put up.
+    func clearPrompt(ifMatches text: String) {
+        if view.prompt == text { view.prompt = nil }
+    }
 }
 
 extension Notification.Name {
@@ -305,9 +312,10 @@ final class OverlayView: NSView {
         self.mover = mover
         super.init(frame: frame)
         wantsLayer = true
-        // Hidden from birth unless practice windows are enabled — waiting for
-        // the first render tick to hide them flashes them at every launch.
-        mockHost.isHidden = !configProvider().useMockWindows
+        // The practice windows are not merely hidden at launch — they don't
+        // EXIST until the first frame that wants them (ensureMockWindows).
+        // A hide can race the first render tick and flash; absence can't.
+        mockHost.isHidden = true
 
         glow.borderColor = NSColor.systemTeal.withAlphaComponent(0.18).cgColor
         glow.borderWidth = 3
@@ -329,15 +337,6 @@ final class OverlayView: NSView {
         seamBarBack.addSublayer(seamBarFill)
         layer?.addSublayer(seamBarBack)
 
-        let notes = MockWindowLayer(title: "Practice window", size: CGSize(width: 380, height: 250), tint: .systemTeal)
-        notes.center = CGPoint(x: frame.width * 0.3, y: frame.height * 0.55)
-        notes.target = notes.center
-        let browser = MockWindowLayer(title: "Scroll practice", size: CGSize(width: 420, height: 280), tint: .systemOrange)
-        browser.center = CGPoint(x: frame.width * 0.68, y: frame.height * 0.42)
-        browser.target = browser.center
-        browser.addScrollContent()
-        mockWindows = [notes, browser]
-        mockWindows.forEach { mockHost.addSublayer($0) }
 
         ring.path = CGPath(ellipseIn: CGRect(x: -ringRadius, y: -ringRadius,
                                              width: ringRadius * 2, height: ringRadius * 2), transform: nil)
@@ -386,6 +385,21 @@ final class OverlayView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// Builds the two practice windows on the first frame that wants them.
+    /// Deliberately NOT done in init: layers that never exist before practice
+    /// can never flash at launch, whatever the render loop's timing does.
+    private func ensureMockWindows() {
+        let notes = MockWindowLayer(title: "Practice window", size: CGSize(width: 380, height: 250), tint: .systemTeal)
+        notes.center = CGPoint(x: bounds.width * 0.3, y: bounds.height * 0.55)
+        notes.target = notes.center
+        let browser = MockWindowLayer(title: "Scroll practice", size: CGSize(width: 420, height: 280), tint: .systemOrange)
+        browser.center = CGPoint(x: bounds.width * 0.68, y: bounds.height * 0.42)
+        browser.target = browser.center
+        browser.addScrollContent()
+        mockWindows = [notes, browser]
+        mockWindows.forEach { mockHost.addSublayer($0) }
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -452,19 +466,30 @@ final class OverlayView: NSView {
             swipeFlash.string = dir > 0 ? "Space  ⟶" : "⟵  Space"
         }
         if s.shakaEvent { // AppState toggled the mode before handing us this
-            swipeFlashTime = CACurrentMediaTime()
-            swipeFlash.foregroundColor = NSColor.systemIndigo.cgColor
-            swipeFlash.string = configProvider().mouseMode ? "🤙  MOUSE ON" : "🤙  MOUSE OFF"
+            let c = configProvider()
+            // Pre-practice tour (and the post-close countdown) suppress the
+            // shaka TOGGLE in AppState — flashing MOUSE ON/OFF here would
+            // announce a switch that didn't happen. Practice shows it: the
+            // drill's feedback is exactly this flash.
+            if !c.tourSandbox || c.useMockWindows {
+                swipeFlashTime = CACurrentMediaTime()
+                swipeFlash.foregroundColor = NSColor.systemIndigo.cgColor
+                swipeFlash.string = c.mouseMode ? "🤙  MOUSE ON" : "🤙  MOUSE OFF"
+            }
         }
         // 👍 fired (once per engine frame — handled here, not in step, so a
         // render frame can never see it twice and double-press Return).
-        // Never in the practice sandbox: a REAL Return keypress would leak
-        // out of "nothing real is touched" into whatever field has focus.
-        if s.sendEvent, !configProvider().useMockWindows {
-            mouse.pressReturnIfTextHasContent()
-            swipeFlashTime = CACurrentMediaTime()
-            swipeFlash.foregroundColor = NSColor.systemGreen.cgColor
-            swipeFlash.string = "👍  ⏎"
+        // Never in the sandbox (tour-wide or practice): a REAL Return
+        // keypress would leak out of "nothing real is touched" into
+        // whatever field has focus.
+        if s.sendEvent {
+            let c = configProvider()
+            if !c.useMockWindows, !c.tourSandbox {
+                mouse.pressReturnIfTextHasContent()
+                swipeFlashTime = CACurrentMediaTime()
+                swipeFlash.foregroundColor = NSColor.systemGreen.cgColor
+                swipeFlash.string = "👍  ⏎"
+            }
         }
     }
 
@@ -477,15 +502,6 @@ final class OverlayView: NSView {
         let now = CACurrentMediaTime()
         let handFresh = state.handVisible && (now - lastSeen) < 0.3
 
-        // One clock for "how long has this pinch been held" — the grab paths
-        // arm on it. A fresh pinch also unthrottles the hover query so the
-        // window under the pointer is known by the time the grab arms.
-        if state.pinching, !wasPinching {
-            pinchBegan = now
-            grabSpent = false
-            lastHoverQuery = -1e9
-        }
-
         // Lightweight: cap this full layer pass at ≤60fps — a ProMotion
         // display otherwise runs it at 120Hz for no visible gain. min 30 lets
         // the system drop further under load. Easing below is already
@@ -495,6 +511,15 @@ final class OverlayView: NSView {
             link.preferredFrameRateRange = config.lightweight
                 ? CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
                 : .default
+        }
+
+        // One clock for "how long has this pinch been held" — the grab paths
+        // arm on it. A fresh pinch also unthrottles the hover query so the
+        // window under the pointer is known by the time the grab arms.
+        if state.pinching, !wasPinching {
+            pinchBegan = now
+            grabSpent = false
+            lastHoverQuery = -1e9
         }
 
         // Hide the HUD while a Space switch animates — anything drawn during
@@ -536,11 +561,11 @@ final class OverlayView: NSView {
         // --- Mouse mode: the eased pointer drives the REAL cursor; pinch is
         // the left button. Grab/hover is suspended — pinch must mean exactly
         // one thing, and pinch-dragging a title bar moves windows natively.
-        // With the practice sandbox on, mouse mode goes VISUAL-ONLY: no
-        // CGEvents post, the system cursor stays put, the fist scrolls the
-        // practice pane — the welcome tour can teach without touching
-        // anything real.
-        let sandbox = config.useMockWindows
+        // With the sandbox on — the whole welcome tour, or the practice
+        // toggle — mouse mode goes VISUAL-ONLY: no CGEvents post, the system
+        // cursor stays put, the fist scrolls the practice pane — the tour
+        // can teach without touching anything real.
+        let sandbox = config.useMockWindows || config.tourSandbox
         if config.mouseMode, sandbox {
             mouse.setCursorHidden(false)
             mouse.releaseIfNeeded()
@@ -597,9 +622,12 @@ final class OverlayView: NSView {
         }
 
         // --- Grab / drag (knuckle-driven, so the pinch curl doesn't lurch it).
-        // The practice windows work in BOTH modes — during the tour a pinch
-        // always grabs something safe, never a real window.
-        let mocksOn = sandbox
+        // The practice windows work in BOTH modes — during practice a pinch
+        // always grabs something safe, never a real window. They appear only
+        // when the mock toggle is on (the tour forces it just for practice);
+        // the rest of the tour is sandboxed WITHOUT them.
+        let mocksOn = config.useMockWindows
+        if mocksOn, mockWindows.isEmpty { ensureMockWindows() }
         mockHost.isHidden = !mocksOn
         let hoverActive: Bool
 
@@ -661,6 +689,19 @@ final class OverlayView: NSView {
                 win.setLook(hovered: win === hovered, grabbed: win === grabbed)
             }
             hoverActive = hovered != nil
+        } else if config.tourSandbox {
+            // Tour open, practice windows not up yet (the "raise your hand"
+            // and permission steps): the pointer gives feedback, but no real
+            // window may be hovered or grabbed.
+            grabbed = nil
+            if grabbedTarget != nil { // tour opened mid-AX-drag: drop in place
+                mover.endDrag(at: lastDragOrigin)
+                grabbedTarget = nil
+            }
+            hoveredTarget = nil
+            latestHover = nil
+            ghost.opacity = 0
+            hoverActive = false
         } else {
             grabbed = nil
             stepRealWindows(config: config, now: now, handFresh: handFresh)
@@ -813,7 +854,7 @@ final class OverlayView: NSView {
     private func stepScroll(config: Config, dt: CFTimeInterval, k: CGFloat, active: Bool) {
         // Derived from the config both call sites already pass — a parameter
         // could silently desync from the mode it must mirror.
-        let sandbox = config.useMockWindows
+        let sandbox = config.useMockWindows || config.tourSandbox
         if sandbox != lastScrollSandbox {
             lastScrollSandbox = sandbox
             // Momentum must not cross worlds: velocity built coasting the

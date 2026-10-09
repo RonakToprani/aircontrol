@@ -73,6 +73,10 @@ final class OnboardingModel: ObservableObject {
     @Published var cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
     @Published var handSeen = false
     @Published var axTrusted = SpaceSwitcher.isTrusted
+    /// Accessibility trust isn't enough for desktop switching — the ⌃←/⌃→
+    /// shortcuts themselves can be turned off in System Settings, and the
+    /// posted events then do nothing. Surfaced on the accessibility step.
+    @Published var spacesShortcutsEnabled = SpaceSwitcher.missionControlShortcutsEnabled
     @Published var calibrated = false
     @Published var enabled = false
     @Published var mouseModeOn = false
@@ -158,6 +162,10 @@ final class OnboardingModel: ObservableObject {
                     self.axTrusted = trusted
                     if trusted, self.step == .accessibility { self.advance(after: 0.8) }
                 }
+                // Same rhythm as the permissions: the user may be flipping the
+                // Mission Control shortcut back on in System Settings right now.
+                let spaces = SpaceSwitcher.missionControlShortcutsEnabled
+                if spaces != self.spacesShortcutsEnabled { self.spacesShortcutsEnabled = spaces }
                 self.maybeAdvanceCamera()
             }
         }
@@ -165,6 +173,12 @@ final class OnboardingModel: ObservableObject {
 
     func teardown() {
         exitPracticeEnvironment() // closing mid-practice must not leak the sandbox
+        // A walkthrough that REACHED practice hands control back in gesture
+        // mode, whatever the drills left behind — mouse mode is ALWAYS a
+        // deliberate, manual choice. A peek at the earlier cards never
+        // touches it: someone working in mouse mode who reopens the tour and
+        // closes it at the welcome card keeps the mode they chose.
+        if sawPractice { app.configStore.config.mouseMode = false }
         pollTimer?.invalidate()
         pollTimer = nil
         cancellables.removeAll()
@@ -172,8 +186,11 @@ final class OnboardingModel: ObservableObject {
 
     // MARK: practice sandbox
 
+    private var sawPractice = false
+
     private func enterPracticeEnvironment() {
         guard !app.practiceSandbox else { return }
+        sawPractice = true
         // A runtime overlay (AppState.effectiveConfig), never a config write:
         // nothing to restore, nothing that can leak to disk if the app dies
         // mid-practice, and the Tuning panel keeps showing real settings.
@@ -206,6 +223,13 @@ final class OnboardingModel: ObservableObject {
 
     func openAccessibilitySettings() {
         SpaceSwitcher.openSystemSettings()
+    }
+
+    /// The camera-denied dead end: the OS never re-prompts once denied, so
+    /// the only way back is the Settings pane itself.
+    func openCameraSettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
+        NSWorkspace.shared.open(url)
     }
 
     func startCalibration() {
@@ -327,16 +351,57 @@ struct OnboardingView: View {
     // MARK: steps
 
     private var welcome: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .frame(width: 96, height: 96)
+                .frame(width: 72, height: 72)
             Text("Welcome to AirControl")
                 .font(.system(size: 28, weight: .bold))
-            Text("Control your Mac with your hand in the air — point, pinch, and scroll through the camera. Everything runs on your Mac; nothing is recorded or sent anywhere.")
-                .font(.body)
+            Text("Control your Mac with your hand in the air, through the camera. Everything runs on your Mac — nothing is recorded or sent anywhere.")
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            // What it does, up front — the pitch before any permissions.
+            VStack(alignment: .leading, spacing: 8) {
+                feature("cursorarrow.motionlines", "Point and click",
+                        "an open hand moves the cursor; a pinch clicks and drags windows")
+                feature("scroll", "Scroll and dictate",
+                        "a fist scrolls; pinch-hold a text box to speak instead of type")
+                feature("rectangle.on.rectangle", "Switch desktops",
+                        "hop between Spaces without touching the trackpad")
+                feature("slider.horizontal.3", "Yours to tune",
+                        "every speed, hold time, and threshold is adjustable")
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+            // Where the app lives — a menu-bar utility has no Dock icon or
+            // window, so point at the ✋ before the user has to go hunting.
+            HStack(spacing: 10) {
+                Image(systemName: "menubar.arrow.up.rectangle")
+                    .foregroundStyle(.teal)
+                Text("AirControl lives in your menu bar — the ✋ hand at the top right of your screen. That's where you turn it on and off, calibrate, and reopen this tour.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private func feature(_ symbol: String, _ title: String, _ detail: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 15))
+                .foregroundStyle(.teal)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -345,7 +410,15 @@ struct OnboardingView: View {
                  title: "Turn on the camera",
                  text: "AirControl watches for your hand through the built-in camera. The video never leaves this Mac — it's processed live and thrown away.") {
             if model.cameraStatus == .denied {
-                statusRow(ok: false, text: "Camera access denied — allow it in System Settings → Privacy & Security → Camera")
+                // Denied is a dead end without help — macOS never re-asks, so
+                // hand over the exact Settings pane instead of a scavenger hunt.
+                VStack(spacing: 10) {
+                    Button("Open Camera Settings") { model.openCameraSettings() }
+                        .controlSize(.large)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.teal)
+                    statusRow(ok: false, text: "Camera access denied — allow it in System Settings → Privacy & Security → Camera")
+                }
             } else if model.enabled && model.cameraStatus == .authorized {
                 statusRow(ok: model.handSeen,
                           text: model.handSeen ? "Hand detected — you're on camera" : "Camera on — raise your hand so it can see you")
@@ -363,7 +436,15 @@ struct OnboardingView: View {
                  title: "Allow Accessibility",
                  text: "This is how AirControl moves windows and clicks for you. The system dialog only opens Settings — flip the AirControl switch there, then come back.") {
             if model.axTrusted {
-                statusRow(ok: true, text: "Accessibility granted")
+                VStack(spacing: 10) {
+                    statusRow(ok: true, text: "Accessibility granted")
+                    // Trust granted but the shortcut itself is off: swipes would
+                    // silently do nothing — warn here, while Settings is fresh
+                    // in mind, rather than let the gesture fail mysteriously.
+                    if !model.spacesShortcutsEnabled {
+                        warningRow(text: "Mission Control's \"Move left a space\" shortcut is off — desktop switching won't work. Re-enable it in System Settings → Keyboard → Keyboard Shortcuts → Mission Control.")
+                    }
+                }
             } else {
                 VStack(spacing: 10) {
                     Button("Open Accessibility Settings") { model.openAccessibilitySettings() }
@@ -431,9 +512,9 @@ struct OnboardingView: View {
     }
 
     private var done: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 52))
+                .font(.system(size: 44))
                 .foregroundStyle(.teal)
             Text("You're set")
                 .font(.system(size: 28, weight: .bold))
@@ -448,10 +529,24 @@ struct OnboardingView: View {
             }
             .padding(16)
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
-            Text("Everything — speeds, hold times, thresholds — is adjustable in Advanced Tuning.")
+            // The hand-over is explicit, never a surprise: Finish means the
+            // hand is live immediately (in gesture mode — the tour turns
+            // mouse mode off on the way out).
+            HStack(spacing: 10) {
+                Image(systemName: "hand.raised")
+                    .foregroundStyle(.teal)
+                Text("Heads up: after you click Finish, a 3-second countdown runs on screen — then your hand is in control and an open hand moves the cursor. Lower your hand if you're not ready.")
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            Text("AirControl stays in your menu bar (✋) — turn it off, recalibrate, open Advanced Tuning, or replay this tour there any time.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -482,6 +577,19 @@ struct OnboardingView: View {
             Text(text)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// statusRow's amber sibling: a real problem, but not one that blocks the
+    /// tour — the rest of AirControl works fine without Space switching.
+    private func warningRow(text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(text)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
