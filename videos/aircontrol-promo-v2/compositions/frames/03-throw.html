@@ -1,0 +1,217 @@
+<template>
+  <style>
+    @font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+    @font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;}
+
+    /* ground: full-bleed clip, outside the camera so the 6% pull never shows an edge */
+    .s03-ground{position:absolute;inset:0;background:#0A0E14;}
+
+    /* the stage clip holds the virtual camera */
+    .s03-stage{position:absolute;inset:0;overflow:hidden;}
+    .s03-world{position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;}
+
+    /* desktop glows live in world space so the whip sweeps them */
+    .s03-glow{position:absolute;width:1900px;height:1200px;border-radius:50%;pointer-events:none;
+      background:radial-gradient(closest-side,rgba(51,191,212,0.13),rgba(51,191,212,0.05) 45%,rgba(51,191,212,0) 100%);}
+    .s03-glow-a{left:-110px;top:-120px;}
+    .s03-glow-b{left:2460px;top:-100px;}
+
+    /* mock macOS window — flat card */
+    .s03-win{position:absolute;background:#151B25;border:1px solid #2E3848;border-radius:12px;box-sizing:border-box;
+      box-shadow:0 30px 80px rgba(0,0,0,0.70);}
+    .s03-titlebar{position:relative;height:46px;border-bottom:1px solid #222B38;display:flex;align-items:center;justify-content:center;}
+    .s03-dots{position:absolute;left:18px;top:17px;display:flex;gap:8px;}
+    .s03-dot{width:12px;height:12px;border-radius:50%;background:#3A4556;}
+    .s03-title{font-family:'Inter',sans-serif;font-weight:500;font-size:17px;line-height:1;color:#8B94A7;letter-spacing:0.01em;}
+    .s03-body{padding:34px 44px 0 44px;display:flex;flex-direction:column;gap:22px;}
+    .s03-line{height:13px;border-radius:6px;background:#3A4556;}
+    .s03-line-h{height:22px;border-radius:7px;background:#3A4556;margin-bottom:6px;}
+    .s03-row{display:flex;align-items:center;gap:14px;}
+    .s03-avatar{width:26px;height:26px;border-radius:50%;background:#3A4556;flex:0 0 auto;}
+    .s03-rowlines{flex:1;display:flex;flex-direction:column;gap:8px;}
+    .s03-rowlines .s03-line{height:10px;}
+
+    /* the thrown group: Notes window + ring travel together */
+    .s03-thrown{position:absolute;left:315px;top:150px;width:1050px;height:600px;}
+    .s03-notes{left:0;top:0;width:1050px;height:600px;}
+    .s03-inbox{left:1935px;top:520px;width:450px;height:340px;box-shadow:0 16px 36px rgba(0,0,0,0.60);}
+    .s03-inbox .s03-body{padding:22px 24px 0 24px;gap:18px;}
+
+    /* 1px teal ghost outline that appears on the pinch */
+    .s03-outline{position:absolute;inset:-1px;border:1px solid #33BFD4;border-radius:12px;opacity:0;pointer-events:none;
+      box-shadow:0 0 18px rgba(51,191,212,0.28);}
+
+    /* the ring = the hand. Placed at its off-frame start; GSAP x/y carry it in */
+    .s03-ring{position:absolute;left:1420px;top:985px;width:90px;height:90px;border-radius:50%;
+      border:2px solid #33BFD4;box-sizing:border-box;
+      box-shadow:0 0 22px rgba(51,191,212,0.50),inset 0 0 12px rgba(51,191,212,0.22);}
+    .s03-burst{position:absolute;left:700px;top:-22px;width:90px;height:90px;border-radius:50%;
+      border:2px solid #33BFD4;box-sizing:border-box;opacity:0;pointer-events:none;}
+
+    /* the one white impact frame */
+    .s03-flash{position:absolute;inset:0;background:#F2F5F9;opacity:0.7;z-index:5;}
+  </style>
+
+  <div id="root" data-composition-id="03-throw" data-start="0" data-duration="4.10" data-width="1920" data-height="1080">
+    <div class="clip s03-ground" id="s03-ground" data-start="0" data-duration="4.10" data-track-index="0"></div>
+
+    <div class="clip s03-stage" id="s03-stage" data-start="0" data-duration="4.10" data-track-index="1" data-layout-allow-overflow>
+      <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+        <filter id="s03-streak" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur id="s03-streak-blur" in="SourceGraphic" stdDeviation="0 0" />
+        </filter>
+      </svg>
+
+      <div class="s03-world" id="s03-world" data-layout-allow-overflow>
+        <div class="s03-glow s03-glow-a"></div>
+        <div class="s03-glow s03-glow-b"></div>
+
+        <div class="s03-win s03-inbox" id="s03-inbox">
+          <div class="s03-titlebar">
+            <div class="s03-dots"><span class="s03-dot"></span><span class="s03-dot"></span><span class="s03-dot"></span></div>
+            <span class="s03-title">Inbox</span>
+          </div>
+          <div class="s03-body">
+            <div class="s03-row"><span class="s03-avatar"></span><div class="s03-rowlines"><span class="s03-line" style="width:62%"></span><span class="s03-line" style="width:88%"></span></div></div>
+            <div class="s03-row"><span class="s03-avatar"></span><div class="s03-rowlines"><span class="s03-line" style="width:48%"></span><span class="s03-line" style="width:80%"></span></div></div>
+            <div class="s03-row"><span class="s03-avatar"></span><div class="s03-rowlines"><span class="s03-line" style="width:70%"></span><span class="s03-line" style="width:92%"></span></div></div>
+            <div class="s03-row"><span class="s03-avatar"></span><div class="s03-rowlines"><span class="s03-line" style="width:54%"></span><span class="s03-line" style="width:76%"></span></div></div>
+          </div>
+        </div>
+
+        <div class="s03-thrown" id="s03-thrown">
+          <div class="s03-win s03-notes" id="s03-notes">
+            <div class="s03-outline" id="s03-outline"></div>
+            <div class="s03-titlebar">
+              <div class="s03-dots"><span class="s03-dot"></span><span class="s03-dot"></span><span class="s03-dot"></span></div>
+              <span class="s03-title">Notes</span>
+            </div>
+            <div class="s03-body">
+              <span class="s03-line-h" style="width:34%"></span>
+              <span class="s03-line" style="width:92%"></span>
+              <span class="s03-line" style="width:86%"></span>
+              <span class="s03-line" style="width:70%"></span>
+              <span class="s03-line" style="width:88%"></span>
+              <span class="s03-line" style="width:61%"></span>
+              <span class="s03-line" style="width:80%"></span>
+              <span class="s03-line" style="width:44%"></span>
+            </div>
+          </div>
+          <div class="s03-burst" id="s03-burst"></div>
+          <div class="s03-ring" id="s03-ring"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="clip s03-flash" id="s03-flash" data-start="3.08" data-duration="0.04" data-track-index="2"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      const world = "#s03-world";
+      const thrown = "#s03-thrown";
+      const notes = "#s03-notes";
+      const outline = "#s03-outline";
+      const ring = "#s03-ring";
+      const burst = "#s03-burst";
+      const blurNode = "#s03-streak-blur";
+      const blurTargets = ["#s03-thrown", "#s03-inbox"];
+
+      // ---- beat grid (two bars) ----
+      const RING_IN = 0.51;   // beat 2
+      const PINCH = 1.03;     // beat 3
+      const THROW = 2.05;     // bar line
+      const LAND = 3.08;      // half-bar: the hit
+
+      // ---- camera + throw geometry (world px at neutral camera) ----
+      // Notes rests centred at x=840; it is thrown +2690 to x=3530.
+      // The camera whips so the landed window sits 120px right of centre (P=3410).
+      const THROW_DX = 2690;
+      const CAM_DX = -(3410 - 960); // = -2450, x = -(P-960)*S at S=1
+      const PULL_S = 0.94;          // the one pull after the hit
+      const CAM_X_PULLED = CAM_DX * PULL_S;
+
+      // three-phase whip, 1.03s total, velocity-continuous across the joins
+      const RAMP = 0.10, BURST = 0.16, TAIL = 0.77;
+      const P1 = 0.107, P2 = 0.45;
+      const whip = (target, prop, total) => {
+        tl.to(target, { [prop]: total * P1, duration: RAMP, ease: "power2.in" }, THROW);
+        tl.to(target, { [prop]: total * P2, duration: BURST, ease: "none" }, THROW + RAMP);
+        tl.to(target, { [prop]: total, duration: TAIL, ease: "power3.out" }, THROW + RAMP + BURST);
+      };
+
+      // ---- Scene 1 (0.00-0.51): pushed in, still. Seeded rest states. ----
+      tl.fromTo(world, { x: 0, scale: 1 }, { x: 0, scale: 1, duration: 0.01, ease: "none" }, 0);
+      tl.fromTo(thrown, { x: 0 }, { x: 0, duration: 0.01, ease: "none" }, 0);
+      tl.fromTo(notes, { scale: 1, boxShadow: "0px 30px 80px rgba(0,0,0,0.70)" },
+        { scale: 1, boxShadow: "0px 30px 80px rgba(0,0,0,0.70)", duration: 0.01, ease: "none" }, 0);
+
+      // ---- Scene 2 (0.51-1.54): the ring arrives, then pinches ----
+      // fast decelerating arc from lower-right onto the title bar: y resolves first (expo), x sweeps in after (power3)
+      tl.fromTo(ring, { x: 0, y: 0, scale: 1 }, { x: -720, duration: 0.42, ease: "power3.out" }, RING_IN);
+      tl.to(ring, { y: -1007, duration: 0.42, ease: "expo.out" }, RING_IN);
+
+      // PINCH on the beat: ring shrinks to 65% and brightens
+      tl.to(ring, { scale: 0.65, duration: 0.14, ease: "expo.out" }, PINCH);
+      tl.to(ring, {
+        borderColor: "#C8F3F9",
+        boxShadow: "0px 0px 42px rgba(51,191,212,0.95),inset 0px 0px 18px rgba(51,191,212,0.55)",
+        duration: 0.14, ease: "expo.out",
+      }, PINCH);
+      // the window gets its teal ghost outline and lifts: quick compress, then settle up (no bounce)
+      tl.fromTo(outline, { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "power2.out" }, PINCH);
+      tl.to(notes, { scale: 0.985, duration: 0.07, ease: "power2.in" }, PINCH);
+      tl.to(notes, { scale: 1.015, duration: 0.30, ease: "expo.out" }, PINCH + 0.07);
+      tl.to(notes, { boxShadow: "0px 42px 96px rgba(0,0,0,0.78)", duration: 0.32, ease: "expo.out" }, PINCH + 0.07);
+
+      // ---- Scene 3 (2.05-3.08): THE THROW ----
+      // window + ring rip right while the camera whips after them (same curve, smaller amplitude,
+      // so the window leads across the frame and the world streaks underneath)
+      whip(thrown, "x", THROW_DX);
+      whip(world, "x", CAM_DX);
+      // camera lunge: a touch of push through the burst, flat again by the landing
+      tl.to(world, { scale: 1.03, duration: RAMP + BURST, ease: "power2.in" }, THROW);
+      tl.to(world, { scale: 1, duration: TAIL, ease: "power3.out" }, THROW + RAMP + BURST);
+
+      // horizontal motion-blur streak on the thrown group and the Inbox passing under it:
+      // filter attached at the throw, blur 0 -> 18 across the ramp, held through the burst,
+      // 18 -> 0 across the fastest part of the tail, then the filter is removed.
+      blurTargets.forEach((sel) => tl.set(sel, { filter: "url(#s03-streak)" }, THROW));
+      tl.fromTo(blurNode, { attr: { stdDeviation: "0 0" } },
+        { attr: { stdDeviation: "18 0" }, duration: RAMP, ease: "none" }, THROW);
+      tl.to(blurNode, { attr: { stdDeviation: "0 0" }, duration: 0.30, ease: "power2.out" }, THROW + RAMP + BURST);
+      blurTargets.forEach((sel) => tl.set(sel, { filter: "none" }, THROW + RAMP + BURST + 0.30));
+
+      // ---- the LANDING at 3.08 (the white impact frame is a 40ms clip, no tween) ----
+      // ring releases to full size, glow back to rest, with a small teal burst
+      tl.to(ring, { scale: 1, duration: 0.22, ease: "expo.out" }, LAND);
+      tl.to(ring, {
+        borderColor: "#33BFD4",
+        boxShadow: "0px 0px 22px rgba(51,191,212,0.50),inset 0px 0px 12px rgba(51,191,212,0.22)",
+        duration: 0.30, ease: "expo.out",
+      }, LAND);
+      // (a set at the hit, not a fromTo: a fromTo's from-state would render at authoring time)
+      tl.set(burst, { scale: 0.5, opacity: 0.85 }, LAND);
+      tl.to(burst, { scale: 2.6, opacity: 0, duration: 0.45, ease: "expo.out" }, LAND);
+      // the window hits: compress, then settle; shadow deepens then relaxes; the ghost outline lets go
+      tl.to(notes, { scale: 0.99, duration: 0.06, ease: "power2.in" }, LAND);
+      tl.to(notes, { scale: 1, duration: 0.45, ease: "expo.out" }, LAND + 0.06);
+      tl.to(notes, { boxShadow: "0px 64px 130px rgba(0,0,0,0.92)", duration: 0.07, ease: "power2.out" }, LAND);
+      tl.to(notes, { boxShadow: "0px 22px 56px rgba(0,0,0,0.62)", duration: 0.60, ease: "expo.out" }, LAND + 0.07);
+      tl.to(outline, { opacity: 0, duration: 0.35, ease: "expo.out" }, LAND);
+
+      // ---- Scene 4 (3.08-4.10): the camera eases back 6% in one pull, then holds still ----
+      tl.to(world, { scale: PULL_S, x: CAM_X_PULLED, duration: 0.70, ease: "expo.out" }, LAND);
+      // the ring idles: one slow, tiny drift
+      tl.to(ring, { y: -1003, duration: 0.80, ease: "sine.inOut" }, LAND + 0.22);
+
+      window.__timelines["03-throw"] = tl;
+    })();
+  </script>
+</template>

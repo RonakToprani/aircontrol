@@ -1,0 +1,91 @@
+<template>
+  <style>
+    @font-face{font-family:'Inter';font-style:normal;font-weight:800;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;}
+    #f07-ground{position:absolute;inset:0;background:#0A0E14;}
+    /* the virtual camera: ONE wrapper, transform written by applyCamera() only */
+    #f07-world{position:absolute;inset:0;width:1920px;height:1080px;transform-origin:50% 50%;will-change:transform;}
+    /* 380x460 landmark box, scaled x2 = 760x920 (~85% of frame height), landmark cloud centred on x */
+    #f07-hand{position:absolute;left:587px;top:40px;width:760px;height:920px;opacity:0.55;}
+    /* pointer ring resting on the index fingertip (128,150) -> screen (843,340) */
+    #f07-ring{position:absolute;left:808px;top:305px;width:70px;height:70px;box-sizing:border-box;border:2px solid #33BFD4;border-radius:50%;opacity:0.9;box-shadow:0 0 18px rgba(51,191,212,0.55),0 0 2px rgba(51,191,212,0.9) inset;}
+    /* the statement: outside the world, dead-centre, never moves after the slam */
+    #f07-type{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+    .f07-line{font-family:'Inter',sans-serif;font-weight:800;font-size:190px;line-height:0.92;letter-spacing:-0.04em;text-transform:lowercase;color:#F2F5F9;white-space:nowrap;}
+    .f07-accent{color:#33BFD4;}
+  </style>
+  <div id="root" data-composition-id="07-see" data-start="0" data-duration="2.05" data-width="1920" data-height="1080">
+    <div class="clip" id="f07-ground" data-start="0" data-duration="2.05" data-track-index="0"></div>
+    <div class="clip" id="f07-world" data-start="0" data-duration="2.05" data-track-index="1">
+      <svg id="f07-hand" viewBox="0 0 380 460" width="760" height="920" aria-hidden="true">
+        <g stroke="#33BFD4" stroke-width="0.7" stroke-linecap="round" fill="none">
+          <!-- thumb chain -->
+          <polyline points="200,420 150,390 110,350 80,310 58,275"/>
+          <!-- index chain -->
+          <polyline points="200,420 150,300 138,235 132,190 128,150"/>
+          <!-- middle chain -->
+          <polyline points="198,290 196,215 195,165 194,120"/>
+          <!-- ring chain -->
+          <polyline points="243,295 250,225 253,180 256,140"/>
+          <!-- little chain -->
+          <polyline points="200,420 285,310 300,255 308,220 315,188"/>
+          <!-- knuckle row -->
+          <polyline points="150,300 198,290 243,295 285,310"/>
+        </g>
+        <g fill="#33BFD4">
+          <circle cx="200" cy="420" r="4.5"/>
+          <circle cx="150" cy="390" r="4.5"/><circle cx="110" cy="350" r="4.5"/><circle cx="80" cy="310" r="4.5"/><circle cx="58" cy="275" r="4.5"/>
+          <circle cx="150" cy="300" r="4.5"/><circle cx="138" cy="235" r="4.5"/><circle cx="132" cy="190" r="4.5"/><circle cx="128" cy="150" r="4.5"/>
+          <circle cx="198" cy="290" r="4.5"/><circle cx="196" cy="215" r="4.5"/><circle cx="195" cy="165" r="4.5"/><circle cx="194" cy="120" r="4.5"/>
+          <circle cx="243" cy="295" r="4.5"/><circle cx="250" cy="225" r="4.5"/><circle cx="253" cy="180" r="4.5"/><circle cx="256" cy="140" r="4.5"/>
+          <circle cx="285" cy="310" r="4.5"/><circle cx="300" cy="255" r="4.5"/><circle cx="308" cy="220" r="4.5"/><circle cx="315" cy="188" r="4.5"/>
+        </g>
+      </svg>
+      <div id="f07-ring"></div>
+    </div>
+    <div class="clip" id="f07-type" data-start="0" data-duration="2.05" data-track-index="2">
+      <div class="f07-line">your mac can see</div>
+      <div class="f07-line">your <span class="f07-accent">hand</span>.</div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+
+    // Beat grid: hits at 0.00 (slam) and 0.51 (the pull-back).
+    const HIT_SLAM = 0.0;
+    const HIT_PULL = 0.51;
+    const FRAME = 1 / 30;
+
+    // --- virtual camera (viewport-change: single wrapper, T = -offset x S) ---
+    // Open aimed at world point (900,400) -- between the fingertips and the knuckles,
+    // so at 2.2x only a handful of dots and hairlines show as abstract geometry.
+    const S0 = 2.2;
+    const AIM_X = 900, AIM_Y = 400;
+    const OFF_X = AIM_X - 960, OFF_Y = AIM_Y - 540;
+    const cam = { scale: S0, x: -OFF_X * S0, y: -OFF_Y * S0 };
+    const world = document.getElementById("f07-world");
+    const applyCamera = () => {
+      world.style.transform = "translate(" + cam.x + "px, " + cam.y + "px) scale(" + cam.scale + ")";
+    };
+    applyCamera(); // seed frame 0 punched in
+
+    // --- Scene 1 (0.00-0.51): the statement slams in. scale 1.12 -> 1, blur clears in 2 frames. Then still forever.
+    tl.fromTo("#f07-type", { scale: 1.12 }, { scale: 1, duration: 0.45, ease: "expo.out" }, HIT_SLAM);
+    tl.fromTo(".f07-line", { filter: "blur(14px)" }, { filter: "blur(0px)", duration: FRAME * 2, ease: "power2.out" }, HIT_SLAM);
+    tl.set(".f07-line", { filter: "none" }, HIT_SLAM + FRAME * 2 + 0.001);
+
+    // --- Scene 2 (0.51-1.41): ONE continuous decelerating zoom-out on the world. The hand was there all along.
+    tl.fromTo(
+      cam,
+      { scale: S0, x: -OFF_X * S0, y: -OFF_Y * S0 },
+      { scale: 1, x: 0, y: 0, duration: 0.9, ease: "expo.out", onUpdate: applyCamera },
+      HIT_PULL
+    );
+
+    // --- Scene 3 (1.41-2.05): hold. Still. No camera, no element motion.
+
+    window.__timelines["07-see"] = tl;
+  </script>
+</template>

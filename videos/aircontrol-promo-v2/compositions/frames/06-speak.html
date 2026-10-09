@@ -1,0 +1,155 @@
+<template>
+  <style>
+    @font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');}
+    @font-face{font-family:'Inter';font-style:normal;font-weight:800;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');}
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;}
+    .s06-ground{position:absolute;inset:0;background:#0A0E14;}
+    /* warm listening bloom, centred on the ring (960,330) */
+    .s06-bloom{position:absolute;left:360px;top:-270px;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle at 50% 50%, rgba(240,160,80,0.34) 0%, rgba(240,160,80,0.16) 24%, rgba(240,160,80,0.05) 42%, rgba(240,160,80,0) 60%);transform-origin:50% 50%;}
+    /* pointer ring, 480px, centred at (960,330) */
+    .s06-ring{position:absolute;left:720px;top:90px;width:480px;height:480px;transform-origin:50% 50%;}
+    .s06-ring svg{display:block;width:480px;height:480px;overflow:visible;}
+    .s06-ring-glow{fill:none;stroke-width:16px;filter:blur(12px);}
+    .s06-ring-main{fill:none;stroke:#33BFD4;stroke-width:6px;}
+    /* pinch constellation, lower-left (380x460 layout scaled 0.82) */
+    .s06-hand{position:absolute;left:144px;top:556px;width:312px;height:377px;}
+    .s06-hand svg{display:block;width:312px;height:377px;overflow:visible;}
+    .s06-bone{stroke:#33BFD4;stroke-opacity:0.45;stroke-width:1.6px;fill:none;stroke-linecap:round;}
+    .s06-dot{fill:#33BFD4;}
+    .s06-tip{fill:#33BFD4;}
+    /* the typed line, one baseline at y~700 */
+    .s06-line{position:absolute;left:0;right:0;top:545px;height:180px;display:flex;justify-content:center;align-items:flex-start;gap:48px;}
+    .s06-word{display:block;font-family:'Inter',sans-serif;font-weight:800;font-size:180px;line-height:1;letter-spacing:-0.04em;color:#F2F5F9;white-space:nowrap;text-transform:lowercase;transform-origin:50% 60%;}
+    /* the small word */
+    .s06-speak{position:absolute;left:120px;top:911px;font-family:'Inter',sans-serif;font-weight:500;font-size:34px;line-height:1;letter-spacing:-0.01em;color:#8B94A7;text-transform:lowercase;white-space:nowrap;}
+  </style>
+  <div id="root" data-composition-id="06-speak" data-start="0" data-duration="2.05" data-width="1920" data-height="1080">
+    <div class="clip s06-ground" id="s06-ground" data-start="0" data-duration="2.05" data-track-index="0"></div>
+
+    <div class="clip" id="s06-bloom-layer" data-start="0" data-duration="2.05" data-track-index="1" style="position:absolute;inset:0;">
+      <div class="s06-bloom" id="s06-bloom"></div>
+    </div>
+
+    <div class="clip" id="s06-hand-layer" data-start="0" data-duration="2.05" data-track-index="2" style="position:absolute;inset:0;">
+      <div class="s06-hand" id="s06-hand">
+        <svg viewBox="0 0 380 460" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- palm -->
+          <line class="s06-bone" x1="200" y1="420" x2="150" y2="390"/>
+          <line class="s06-bone" x1="200" y1="420" x2="150" y2="300"/>
+          <line class="s06-bone" x1="200" y1="420" x2="285" y2="310"/>
+          <line class="s06-bone" x1="150" y1="300" x2="198" y2="290"/>
+          <line class="s06-bone" x1="198" y1="290" x2="243" y2="295"/>
+          <line class="s06-bone" x1="243" y1="295" x2="285" y2="310"/>
+          <!-- thumb -->
+          <line class="s06-bone" x1="150" y1="390" x2="110" y2="350"/>
+          <line class="s06-bone" x1="110" y1="350" x2="80" y2="310"/>
+          <line class="s06-bone" id="s06-thumb-bone" x1="80" y1="310" x2="55" y2="275"/>
+          <!-- index -->
+          <line class="s06-bone" x1="150" y1="300" x2="138" y2="235"/>
+          <line class="s06-bone" x1="138" y1="235" x2="132" y2="190"/>
+          <line class="s06-bone" id="s06-index-bone" x1="132" y1="190" x2="128" y2="145"/>
+          <!-- middle -->
+          <line class="s06-bone" x1="198" y1="290" x2="196" y2="215"/>
+          <line class="s06-bone" x1="196" y1="215" x2="195" y2="165"/>
+          <line class="s06-bone" x1="195" y1="165" x2="194" y2="120"/>
+          <!-- ring -->
+          <line class="s06-bone" x1="243" y1="295" x2="250" y2="225"/>
+          <line class="s06-bone" x1="250" y1="225" x2="253" y2="180"/>
+          <line class="s06-bone" x1="253" y1="180" x2="256" y2="140"/>
+          <!-- little -->
+          <line class="s06-bone" x1="285" y1="310" x2="300" y2="255"/>
+          <line class="s06-bone" x1="300" y1="255" x2="308" y2="220"/>
+          <line class="s06-bone" x1="308" y1="220" x2="315" y2="188"/>
+          <!-- 21 landmarks -->
+          <circle class="s06-dot" cx="200" cy="420" r="5.5"/>
+          <circle class="s06-dot" cx="150" cy="390" r="5"/>
+          <circle class="s06-dot" cx="110" cy="350" r="5"/>
+          <circle class="s06-dot" cx="80" cy="310" r="5"/>
+          <circle class="s06-tip" id="s06-thumb-tip" cx="55" cy="275" r="6.5"/>
+          <circle class="s06-dot" cx="150" cy="300" r="5"/>
+          <circle class="s06-dot" cx="138" cy="235" r="5"/>
+          <circle class="s06-dot" cx="132" cy="190" r="5"/>
+          <circle class="s06-tip" id="s06-index-tip" cx="128" cy="145" r="6.5"/>
+          <circle class="s06-dot" cx="198" cy="290" r="5"/>
+          <circle class="s06-dot" cx="196" cy="215" r="5"/>
+          <circle class="s06-dot" cx="195" cy="165" r="5"/>
+          <circle class="s06-dot" cx="194" cy="120" r="5"/>
+          <circle class="s06-dot" cx="243" cy="295" r="5"/>
+          <circle class="s06-dot" cx="250" cy="225" r="5"/>
+          <circle class="s06-dot" cx="253" cy="180" r="5"/>
+          <circle class="s06-dot" cx="256" cy="140" r="5"/>
+          <circle class="s06-dot" cx="285" cy="310" r="5"/>
+          <circle class="s06-dot" cx="300" cy="255" r="5"/>
+          <circle class="s06-dot" cx="308" cy="220" r="5"/>
+          <circle class="s06-dot" cx="315" cy="188" r="5"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="clip" id="s06-ring-layer" data-start="0" data-duration="2.05" data-track-index="3" style="position:absolute;inset:0;">
+      <div class="s06-ring" id="s06-ring">
+        <svg viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle class="s06-ring-glow" id="s06-glow-teal" cx="240" cy="240" r="237" stroke="#33BFD4" opacity="0.32"/>
+          <circle class="s06-ring-glow" id="s06-glow-orange" cx="240" cy="240" r="237" stroke="#F0A050" opacity="0"/>
+          <circle class="s06-ring-main" id="s06-ring-main" cx="240" cy="240" r="237" stroke="#33BFD4"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="clip s06-line" id="s06-line" data-start="0" data-duration="2.05" data-track-index="4">
+      <span class="s06-word" id="s06-w1">ship</span>
+      <span class="s06-word" id="s06-w2">it</span>
+      <span class="s06-word" id="s06-w3">tonight</span>
+    </div>
+
+    <div class="clip" id="s06-speak-layer" data-start="0" data-duration="2.05" data-track-index="5" style="position:absolute;inset:0;">
+      <div class="s06-speak" id="s06-speak">speak.</div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+
+    // One bar at ~117 BPM: the four hits.
+    const BEATS = [0, 0.51, 1.03, 1.54];
+    const PINCH = { x: 100, y: 215 };
+    const TEAL = "#33BFD4", ORANGE = "#F0A050";
+
+    // Scene 1 — the pinch closes on the cut (0.00–0.20s): both tips travel to meet.
+    tl.fromTo("#s06-thumb-tip", { attr: { cx: 55, cy: 275 } }, { attr: { cx: PINCH.x, cy: PINCH.y }, duration: 0.2, ease: "power3.out" }, BEATS[0]);
+    tl.fromTo("#s06-thumb-bone", { attr: { x2: 55, y2: 275 } }, { attr: { x2: PINCH.x, y2: PINCH.y }, duration: 0.2, ease: "power3.out" }, BEATS[0]);
+    tl.fromTo("#s06-index-tip", { attr: { cx: 128, cy: 145 } }, { attr: { cx: PINCH.x, cy: PINCH.y }, duration: 0.2, ease: "power3.out" }, BEATS[0]);
+    tl.fromTo("#s06-index-bone", { attr: { x2: 128, y2: 145 } }, { attr: { x2: PINCH.x, y2: PINCH.y }, duration: 0.2, ease: "power3.out" }, BEATS[0]);
+    // the ring shrinks a touch with the pinch
+    tl.fromTo("#s06-ring", { scale: 1 }, { scale: 0.9, duration: 0.2, ease: "power3.out" }, BEATS[0]);
+
+    // 0.30s — listening: the ring turns orange, a warm bloom opens behind it.
+    const LISTEN = 0.30;
+    tl.to("#s06-ring-main", { attr: { stroke: ORANGE }, duration: 0.12, ease: "power2.out" }, LISTEN);
+    tl.to("#s06-glow-teal", { attr: { opacity: 0 }, duration: 0.12, ease: "power2.out" }, LISTEN);
+    tl.fromTo("#s06-glow-orange", { attr: { opacity: 0 } }, { attr: { opacity: 0.6 }, duration: 0.3, ease: "power2.out" }, LISTEN);
+    tl.fromTo("#s06-bloom", { opacity: 0, scale: 0.72 }, { opacity: 1, scale: 1, duration: 0.42, ease: "expo.out" }, LISTEN);
+
+    // Scene 2 — the words slam in on the hits: scale 1.12 -> 1, 2-frame blur clearing, expo settle.
+    const BLUR = 0.07; // ~2 frames
+    const slam = (sel, at, from) => {
+      // one baseline fromTo per word (opacity + the 2-frame blur clear); the scale settle rides on top
+      tl.fromTo(sel, { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: BLUR, ease: "power1.out" }, at);
+      tl.fromTo(sel, Object.assign({ scale: 1.12 }, from), { scale: 1, x: 0, y: 0, duration: 0.34, ease: "expo.out", immediateRender: false }, at);
+    };
+    slam("#s06-w1", BEATS[1], { x: 0, y: 0 });
+    slam("#s06-w2", BEATS[2], { x: -14, y: 0 });
+    slam("#s06-w3", BEATS[3], { x: 0, y: 12 });
+
+    // Scene 3 — "speak." bottom-left on the last hit; the ring eases back to teal at 1.70.
+    tl.fromTo("#s06-speak", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }, BEATS[3]);
+    const BACK = 1.70;
+    tl.to("#s06-ring-main", { attr: { stroke: TEAL }, duration: 0.3, ease: "power2.inOut" }, BACK);
+    tl.to("#s06-glow-orange", { attr: { opacity: 0 }, duration: 0.3, ease: "power2.inOut" }, BACK);
+    tl.to("#s06-glow-teal", { attr: { opacity: 0.32 }, duration: 0.3, ease: "power2.inOut" }, BACK);
+    tl.to("#s06-bloom", { opacity: 0, duration: 0.3, ease: "power2.inOut" }, BACK);
+
+    window.__timelines["06-speak"] = tl;
+  </script>
+</template>

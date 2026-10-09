@@ -1,0 +1,120 @@
+<template>
+  <style>
+    @font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');}
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;}
+    .s05-world{position:absolute;left:0;top:0;width:1920px;height:1080px;}
+    .s05-win{position:absolute;box-sizing:border-box;background:#151B25;border:1px solid #2E3848;border-radius:12px;overflow:hidden;}
+    .s05-bar{height:48px;display:flex;align-items:center;gap:8px;padding:0 18px;border-bottom:1px solid #2E3848;font-family:'Inter',sans-serif;font-weight:500;font-size:20px;color:#8B94A7;}
+    .s05-bar u{width:12px;height:12px;border-radius:50%;background:#2E3848;display:block;}
+    .s05-bar span{margin-left:10px;}
+    .s05-body{padding:28px 30px;display:flex;flex-direction:column;gap:20px;}
+    .s05-body i{display:block;height:14px;border-radius:4px;background:#3A4556;opacity:.55;}
+    .s05-grid{display:grid;grid-template-columns:repeat(7,44px);gap:8px;padding:28px 30px;}
+    .s05-grid b{display:block;width:44px;height:44px;border-radius:6px;background:#3A4556;opacity:.35;}
+    .s05-grid b.t{background:#33BFD4;opacity:.8;}
+    .s05-hand{position:absolute;left:0;top:0;width:1920px;height:1080px;}
+    .s05-space{position:absolute;left:1300px;top:104px;width:200px;text-align:center;font-family:'Inter',sans-serif;font-weight:500;font-size:22px;line-height:1.2;color:#33BFD4;opacity:0;}
+    .s05-word{position:absolute;left:120px;top:918px;font-family:'Inter',sans-serif;font-weight:500;font-size:34px;line-height:1.2;color:#8B94A7;opacity:0;white-space:nowrap;}
+  </style>
+  <div id="root" data-composition-id="05-thumb" data-start="0" data-duration="1.03" data-width="1920" data-height="1080">
+    <div class="clip" id="s05-ground" data-start="0" data-duration="1.03" data-track-index="0" style="position:absolute;inset:0;background:#0A0E14;"></div>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+      <filter id="s05-streak" x="-5%" y="0" width="110%" height="100%"><feGaussianBlur id="s05-blur" in="SourceGraphic" stdDeviation="0 0"/></filter>
+    </svg>
+    <div class="clip s05-world" id="s05-wa" data-start="0" data-duration="1.03" data-track-index="1">
+      <div class="s05-win" style="left:1000px;top:150px;width:780px;height:640px;">
+        <div class="s05-bar"><u></u><u></u><u></u><span>Document</span></div>
+        <div class="s05-body"><i style="width:62%"></i><i style="width:92%"></i><i style="width:84%"></i><i style="width:90%"></i><i style="width:48%"></i><i style="width:88%"></i><i style="width:76%"></i><i style="width:91%"></i><i style="width:40%"></i><i style="width:85%"></i></div>
+      </div>
+    </div>
+    <div class="clip s05-world" id="s05-wb" style="left:1920px" data-start="0" data-duration="1.03" data-track-index="2">
+      <div class="s05-win" style="left:950px;top:190px;width:430px;height:580px;">
+        <div class="s05-bar"><u></u><u></u><u></u><span>Mail</span></div>
+        <div class="s05-body"><i style="width:55%"></i><i style="width:90%"></i><i style="width:70%"></i><i style="width:40%"></i><i style="width:88%"></i><i style="width:64%"></i><i style="width:92%"></i><i style="width:50%"></i><i style="width:80%"></i></div>
+      </div>
+      <div class="s05-win" style="left:1420px;top:190px;width:430px;height:420px;">
+        <div class="s05-bar"><u></u><u></u><u></u><span>Calendar</span></div>
+        <div class="s05-grid"><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class="t"></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class="t"></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class="t"></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class="t"></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b><b class=""></b></div>
+      </div>
+    </div>
+    <svg class="clip s05-hand" id="s05-hand" data-start="0" data-duration="1.03" data-track-index="3" viewBox="0 0 1920 1080"></svg>
+    <div class="clip s05-space" id="s05-space" data-start="0" data-duration="1.03" data-track-index="4">space &#8594;</div>
+    <div class="clip s05-word" id="s05-word" data-start="0" data-duration="1.03" data-track-index="5">switch.</div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    const NS = "http://www.w3.org/2000/svg";
+    // fist pose spans 172x130 landmark units -> x5.846 = ~760px tall (70% of frame), centred on (620,560)
+    const S = 5.846, OX = -724.6, OY = -1515.3;
+    const M = (p) => [OX + S * p[0], OY + S * p[1]];
+    // 21 landmarks: 0 wrist, 1-4 thumb, then index/middle/ring/little x (MCP,PIP,DIP,tip)
+    const fist = [
+      [200,420],
+      [150,390],[178,384],[208,380],[238,376],
+      [150,300],[144,344],[162,370],[180,350],
+      [198,290],[194,338],[212,366],[230,346],
+      [243,295],[242,340],[258,366],[276,348],
+      [285,310],[289,350],[302,372],[316,356]
+    ];
+    const thumbEnd = [[240,370],[300,360],[350,352],[400,348]];
+    const pts = fist.map(M);
+    const edges = [[0,1],[1,2],[2,3],[3,4],[0,5],[0,17],[5,9],[9,13],[13,17]];
+    [5,9,13,17].forEach((b) => { edges.push([b,b+1],[b+1,b+2],[b+2,b+3]); });
+    const svg = document.getElementById("s05-hand");
+    const lines = edges.map((e) => {
+      const l = document.createElementNS(NS, "line");
+      l.setAttribute("stroke", "#33BFD4"); l.setAttribute("stroke-opacity", "0.6");
+      l.setAttribute("stroke-width", "4"); l.setAttribute("stroke-linecap", "round");
+      svg.appendChild(l); return l;
+    });
+    const dots = pts.map(() => {
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("r", "14"); c.setAttribute("fill", "#33BFD4");
+      svg.appendChild(c); return c;
+    });
+    function render() {
+      lines.forEach((l, i) => {
+        const a = pts[edges[i][0]], b = pts[edges[i][1]];
+        l.setAttribute("x1", a[0]); l.setAttribute("y1", a[1]);
+        l.setAttribute("x2", b[0]); l.setAttribute("y2", b[1]);
+      });
+      dots.forEach((c, i) => { c.setAttribute("cx", pts[i][0]); c.setAttribute("cy", pts[i][1]); });
+    }
+    render();
+    // thumb swing: joints 1-4 travel from tucked to pointing right, tip lagging slightly
+    [0,1,2,3].forEach((k) => {
+      const from = M(fist[k + 1]), to = M(thumbEnd[k]);
+      const pr = { v: 0 };
+      tl.to(pr, { v: 1, duration: 0.16 + (k === 0 ? 0 : 0.01), ease: "power3.out",
+        onUpdate: () => {
+          pts[k + 1][0] = from[0] + (to[0] - from[0]) * pr.v;
+          pts[k + 1][1] = from[1] + (to[1] - from[1]) * pr.v;
+          render();
+        } }, 0.02 * k);
+    });
+
+    // world push-slide on the hit
+    const HIT = 0.26;
+    const blurNode = document.getElementById("s05-blur");
+    const bp = { v: 0 };
+    const writeBlur = () => blurNode.setAttribute("stdDeviation", bp.v + " 0");
+    writeBlur();
+    tl.set(["#s05-wa", "#s05-wb"], { filter: "url(#s05-streak)" }, HIT);
+    tl.fromTo("#s05-wa", { x: 0 }, { immediateRender: false, x: -1920, duration: 0.45, ease: "expo.out" }, HIT);
+    tl.fromTo("#s05-wb", { x: 0 }, { immediateRender: false, x: -1920, duration: 0.45, ease: "expo.out" }, HIT);
+    tl.to(bp, { v: 20, duration: 0.07, ease: "power2.in", onUpdate: writeBlur }, HIT);
+    tl.to(bp, { v: 0, duration: 0.15, ease: "power3.out", onUpdate: writeBlur }, HIT + 0.07);
+    tl.set(["#s05-wa", "#s05-wb"], { filter: "none" }, HIT + 0.23);
+
+    // space label flash
+    tl.fromTo("#s05-space", { opacity: 0 }, { immediateRender: false, opacity: 1, duration: 0.067, ease: "none" }, 0.28);
+    tl.to("#s05-space", { opacity: 0, duration: 0.3, ease: "power2.out" }, 0.37);
+
+    // word
+    tl.fromTo("#s05-word", { opacity: 0 }, { immediateRender: false, opacity: 1, duration: 0.15, ease: "power2.out" }, 0.77);
+
+    window.__timelines["05-thumb"] = tl;
+  </script>
+</template>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js" integrity="sha384-sG0Hv1tP1lZCk9KQmrIbY/XNwi+OY84GQqhMscbnsoBFqAz8KNCil1kvfL3Hbbk2" crossorigin="anonymous"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #0A0E14;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="19.01"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div
+        id="el-01-eye"
+        class="scene"
+        data-composition-id="01-eye"
+        data-composition-src="compositions/frames/01-eye.html"
+        data-start="0"
+        data-duration="2.05"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-02-slams"
+        class="scene"
+        data-composition-id="02-slams"
+        data-composition-src="compositions/frames/02-slams.html"
+        data-start="2.05"
+        data-duration="2.05"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-03-throw"
+        class="scene"
+        data-composition-id="03-throw"
+        data-composition-src="compositions/frames/03-throw.html"
+        data-start="4.1"
+        data-duration="4.1"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-04-fist"
+        class="scene"
+        data-composition-id="04-fist"
+        data-composition-src="compositions/frames/04-fist.html"
+        data-start="8.2"
+        data-duration="1.03"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-05-thumb"
+        class="scene"
+        data-composition-id="05-thumb"
+        data-composition-src="compositions/frames/05-thumb.html"
+        data-start="9.229999999999999"
+        data-duration="1.03"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-06-speak"
+        class="scene"
+        data-composition-id="06-speak"
+        data-composition-src="compositions/frames/06-speak.html"
+        data-start="10.259999999999998"
+        data-duration="2.05"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-07-see"
+        class="scene"
+        data-composition-id="07-see"
+        data-composition-src="compositions/frames/07-see.html"
+        data-start="12.309999999999999"
+        data-duration="2.05"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-08-nothing"
+        class="scene"
+        data-composition-id="08-nothing"
+        data-composition-src="compositions/frames/08-nothing.html"
+        data-start="14.36"
+        data-duration="2.05"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-09-sting"
+        class="scene"
+        data-composition-id="09-sting"
+        data-composition-src="compositions/frames/09-sting.html"
+        data-start="16.41"
+        data-duration="2.6"
+        data-track-index="1"
+      ></div>
+    <!-- music bed: Mixkit "Brainiac" (Alejandro Magaña), Mixkit Stock Music Free License; pre-cut so a hit lands at t=0 -->
+    <audio id="bgm" src="assets/bgm-brainiac.mp3" data-start="0" data-duration="19.0" data-track-index="11"></audio>
+
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

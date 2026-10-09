@@ -1,0 +1,25 @@
+<template>
+  <style>
+    @font-face{font-family:'Inter';font-style:normal;font-weight:800;font-display:swap;src:url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format('woff2');}
+    #root{position:relative;width:1920px;height:1080px;overflow:hidden;}
+    .s02-line{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+    .s02-word{display:block;font-family:'Inter',sans-serif;font-weight:800;font-size:240px;line-height:1;letter-spacing:-0.04em;color:#F2F5F9;white-space:nowrap;text-transform:lowercase;transform-origin:50% 50%;}
+    .s02-dot{color:#33BFD4;}
+  </style>
+  <div id="root" data-composition-id="02-slams" data-start="0" data-duration="2.05" data-width="1920" data-height="1080">
+    <div class="clip s02-ground" data-start="0" data-duration="2.05" data-track-index="0" style="position:absolute;inset:0;background:#0A0E14;"></div>
+    <div class="clip s02-line" data-start="0" data-duration="1.03" data-track-index="1"><span class="s02-word" id="s02-a">no mouse<span class="s02-dot">.</span></span></div>
+    <div class="clip s02-line" data-start="1.03" data-duration="1.02" data-track-index="1"><span class="s02-word" id="s02-b">no trackpad<span class="s02-dot">.</span></span></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    const BEATS = [0, 1.03];
+    ["#s02-a", "#s02-b"].forEach((sel, i) => {
+      tl.fromTo(sel, { scale: 1.12 }, { scale: 1, duration: 0.45, ease: "expo.out" }, BEATS[i]);
+      tl.fromTo(sel, { filter: "blur(18px)" }, { filter: "blur(0px)", duration: 0.067, ease: "none" }, BEATS[i]);
+    });
+    window.__timelines["02-slams"] = tl;
+  </script>
+</template>

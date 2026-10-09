@@ -1,0 +1,295 @@
+<template>
+<style>
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 800;
+    font-display: block;
+    src: url("assets/fonts/captured-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2") format("woff2");
+  }
+
+  #root {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    container-type: size;
+    font-family: "Inter", sans-serif;
+    color: #f2f5f9;
+  }
+  .clip {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* track 0: the OLED-dark ground */
+  .f01-eye-ground { background: #0a0e14; }
+
+  /* full-frame SVG stages */
+  .f01-eye-svg {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    display: block;
+    overflow: visible;
+  }
+
+  /* the ring: thin teal circle + soft outer glow (two blurred copies behind it) */
+  .f01-eye-ring-glow-wide {
+    fill: none;
+    stroke: #33bfd4;
+    stroke-width: 70;
+    filter: url(#f01-eye-blur-wide);
+  }
+  .f01-eye-ring-glow {
+    fill: none;
+    stroke: #33bfd4;
+    stroke-width: 24;
+    filter: url(#f01-eye-blur);
+  }
+  .f01-eye-ring-stroke {
+    fill: none;
+    stroke: #33bfd4;
+    stroke-width: 6;
+  }
+
+  /* the hand constellation: hairline bones + landmark dots */
+  .f01-eye-bone {
+    fill: none;
+    stroke: #33bfd4;
+    stroke-opacity: 0.75;
+    stroke-width: 1.8;          /* ×1.8 scale → ~3.2px on the 1080 canvas */
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .f01-eye-dot {
+    fill: #33bfd4;
+    fill-opacity: 0.95;
+    will-change: transform;
+  }
+  .f01-eye-tip {
+    fill: #a6ecf4;              /* fingertips: the hot, bright end of the teal */
+    fill-opacity: 1;
+    will-change: transform;
+  }
+  .f01-eye-halo {
+    fill: #33bfd4;
+    fill-opacity: 0.55;
+    filter: url(#f01-eye-blur-halo);
+    will-change: transform;
+  }
+</style>
+
+<div id="root" data-composition-id="01-eye" data-width="1920" data-height="1080" data-duration="2.05">
+
+  <!-- track 0: flat ink-black ground, full duration -->
+  <div id="f01-eye-layer-ground" class="clip f01-eye-ground" data-start="0" data-duration="2.05" data-track-index="0"></div>
+
+  <!-- track 1: the ring — blooms from zero at dead-center on the t=0 hit -->
+  <div id="f01-eye-layer-ring" class="clip" data-start="0" data-duration="2.05" data-track-index="1">
+    <svg class="f01-eye-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <filter id="f01-eye-blur-wide" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+          <feGaussianBlur stdDeviation="34" />
+        </filter>
+        <filter id="f01-eye-blur" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+          <feGaussianBlur stdDeviation="12" />
+        </filter>
+      </defs>
+      <g id="f01-eye-ring">
+        <g id="f01-eye-ring-glow">
+          <circle class="f01-eye-ring-glow-wide" cx="960" cy="540" r="325" />
+          <circle class="f01-eye-ring-glow" cx="960" cy="540" r="325" />
+        </g>
+        <circle id="f01-eye-ring-stroke" class="f01-eye-ring-stroke" cx="960" cy="540" r="325" />
+      </g>
+    </svg>
+  </div>
+
+  <!-- track 2: the hand constellation — draws itself inside the ring on beats +0.51 / +1.03 / +1.54 -->
+  <div id="f01-eye-layer-hand" class="clip" data-start="0" data-duration="2.05" data-track-index="2">
+    <svg class="f01-eye-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <filter id="f01-eye-blur-halo" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+          <feGaussianBlur stdDeviation="4.5" />
+        </filter>
+      </defs>
+      <!-- 380×460 landmark space, ×1.8 → the hand spans 540px (50% of height), centred on (960,540) -->
+      <g transform="translate(624.3 54) scale(1.8)">
+
+        <!-- stroke 1 (beat +0.51): palm bones — wrist spokes to each chain root, then the knuckle row -->
+        <g id="f01-eye-palm">
+          <path class="f01-eye-bone f01-eye-spoke" d="M 200 420 L 150 390" />
+          <path class="f01-eye-bone f01-eye-spoke" d="M 200 420 L 150 300" />
+          <path class="f01-eye-bone f01-eye-spoke" d="M 200 420 L 198 290" />
+          <path class="f01-eye-bone f01-eye-spoke" d="M 200 420 L 243 295" />
+          <path class="f01-eye-bone f01-eye-spoke" d="M 200 420 L 285 310" />
+          <path id="f01-eye-knuckles" class="f01-eye-bone" d="M 150 300 L 198 290 L 243 295 L 285 310" />
+        </g>
+
+        <!-- stroke 2 (beat +1.03): the four fingers, root → tip -->
+        <g id="f01-eye-fingers">
+          <path class="f01-eye-bone f01-eye-finger" d="M 150 300 L 138 235 L 132 190 L 128 150" />
+          <path class="f01-eye-bone f01-eye-finger" d="M 198 290 L 196 215 L 195 165 L 194 120" />
+          <path class="f01-eye-bone f01-eye-finger" d="M 243 295 L 250 225 L 253 180 L 256 140" />
+          <path class="f01-eye-bone f01-eye-finger" d="M 285 310 L 300 255 L 308 220 L 315 188" />
+        </g>
+
+        <!-- stroke 3 (beat +1.54): the thumb -->
+        <path id="f01-eye-thumb" class="f01-eye-bone" d="M 150 390 L 110 350 L 80 310 L 58 275" />
+
+        <!-- the 21 landmark dots, popping on beat +1.54; data-ring = steps from the wrist -->
+        <g id="f01-eye-dots">
+          <!-- fingertip halos (behind the tips) -->
+          <circle class="f01-eye-halo" data-ring="4" cx="58"  cy="275" r="15" />
+          <circle class="f01-eye-halo" data-ring="4" cx="128" cy="150" r="15" />
+          <circle class="f01-eye-halo" data-ring="4" cx="194" cy="120" r="15" />
+          <circle class="f01-eye-halo" data-ring="4" cx="256" cy="140" r="15" />
+          <circle class="f01-eye-halo" data-ring="4" cx="315" cy="188" r="15" />
+
+          <!-- wrist -->
+          <circle class="f01-eye-dot" data-ring="0" cx="200" cy="420" r="4.6" />
+          <!-- thumb -->
+          <circle class="f01-eye-dot" data-ring="1" cx="150" cy="390" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="2" cx="110" cy="350" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="3" cx="80"  cy="310" r="4.4" />
+          <circle class="f01-eye-tip" data-ring="4" cx="58"  cy="275" r="6.1" />
+          <!-- index -->
+          <circle class="f01-eye-dot" data-ring="1" cx="150" cy="300" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="2" cx="138" cy="235" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="3" cx="132" cy="190" r="4.4" />
+          <circle class="f01-eye-tip" data-ring="4" cx="128" cy="150" r="6.1" />
+          <!-- middle -->
+          <circle class="f01-eye-dot" data-ring="1" cx="198" cy="290" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="2" cx="196" cy="215" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="3" cx="195" cy="165" r="4.4" />
+          <circle class="f01-eye-tip" data-ring="4" cx="194" cy="120" r="6.1" />
+          <!-- ring -->
+          <circle class="f01-eye-dot" data-ring="1" cx="243" cy="295" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="2" cx="250" cy="225" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="3" cx="253" cy="180" r="4.4" />
+          <circle class="f01-eye-tip" data-ring="4" cx="256" cy="140" r="6.1" />
+          <!-- little -->
+          <circle class="f01-eye-dot" data-ring="1" cx="285" cy="310" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="2" cx="300" cy="255" r="4.4" />
+          <circle class="f01-eye-dot" data-ring="3" cx="308" cy="220" r="4.4" />
+          <circle class="f01-eye-tip" data-ring="4" cx="315" cy="188" r="6.1" />
+        </g>
+      </g>
+    </svg>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<script>
+  (function () {
+    var ID = "01-eye";
+    var root = document.querySelector('[data-composition-id="' + ID + '"]');
+    var $ = function (sel) { return root.querySelector(sel); };
+    var $$ = function (sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); };
+
+    // ── the beat grid (music hit at t=0 of this frame) ─────────────────
+    var HIT = 0.0;
+    var B1 = 0.51;   // palm bones
+    var B2 = 1.03;   // four fingers
+    var B3 = 1.54;   // thumb + all 21 dots
+    var HALF = B3 + (B3 - B2) / 2;   // 1.795 — the half-beat glow pulse in the hold
+
+    var GLOW_REST = 0.55;
+
+    // ── svg-path-draw setup: measured lengths, dash = offset = length ───
+    var bones = $$("#f01-eye-palm path, #f01-eye-fingers path, #f01-eye-thumb");
+    bones.forEach(function (p) {
+      var len = p.getTotalLength() * 1.02;
+      p.style.strokeDasharray = String(len);
+      p.style.strokeDashoffset = String(len);
+      p.dataset.len = String(len);
+    });
+    var drawFromTo = function (el, at, dur) {
+      var len = parseFloat(el.dataset.len);
+      tl.fromTo(
+        el,
+        { strokeDashoffset: len },
+        { strokeDashoffset: 0, duration: dur, ease: "power2.out" },
+        at
+      );
+    };
+
+    var tl = gsap.timeline({ paused: true });
+
+    // ── Scene 1 (0.00–0.51): the ring BLOOMS from zero on the hit ──────
+    // spring-pop-entrance, expo settle, no overshoot; glow blooms with it.
+    tl.fromTo(
+      "#f01-eye-ring",
+      { scale: 0, opacity: 0, svgOrigin: "960 540" },
+      { scale: 1, opacity: 1, svgOrigin: "960 540", duration: 0.5, ease: "expo.out" },
+      HIT
+    );
+    // the stroke flashes white-teal on the hit, then rests teal
+    tl.fromTo(
+      "#f01-eye-ring-stroke",
+      { stroke: "#eafcfe" },
+      { stroke: "#33bfd4", duration: 0.14, ease: "power2.out" },
+      HIT
+    );
+    // the glow is hot on the hit and settles to its resting intensity
+    tl.fromTo(
+      "#f01-eye-ring-glow",
+      { opacity: 1 },
+      { opacity: GLOW_REST, duration: 0.5, ease: "expo.out" },
+      HIT
+    );
+
+    // ── Scene 2 (0.51–1.54): the hand draws on in three strokes ────────
+    // beat +0.51 — palm bones: five spokes radiate from the wrist, the knuckle row follows
+    $$(".f01-eye-spoke").forEach(function (p) { drawFromTo(p, B1, 0.32); });
+    drawFromTo($("#f01-eye-knuckles"), B1 + 0.2, 0.26);
+
+    // beat +1.03 — the four fingers draw root → tip (hairline stagger, lands inside the beat)
+    $$(".f01-eye-finger").forEach(function (p, i) { drawFromTo(p, B2 + i * 0.03, 0.36); });
+
+    // beat +1.54 — the thumb, and all 21 dots pop (wrist → tips, a 60ms ripple)
+    drawFromTo($("#f01-eye-thumb"), B3, 0.3);
+    $$("#f01-eye-dots circle").forEach(function (c) {
+      var step = parseInt(c.getAttribute("data-ring"), 10) || 0;
+      tl.fromTo(
+        c,
+        { scale: 0, opacity: 0, transformOrigin: "50% 50%" },
+        { scale: 1, opacity: 1, transformOrigin: "50% 50%", duration: 0.34, ease: "expo.out" },
+        B3 + step * 0.015
+      );
+    });
+
+    // the glow ticks lightly on each draw beat — the ring reacts to every hit
+    [B1, B2, B3].forEach(function (b) {
+      tl.fromTo(
+        "#f01-eye-ring-glow",
+        { opacity: 0.78 },
+        { opacity: GLOW_REST, duration: 0.3, ease: "expo.out", immediateRender: false },
+        b
+      );
+    });
+
+    // ── Scene 3 (1.54–2.05): hold; one more glow pulse on the half-beat, then settle ──
+    tl.fromTo(
+      "#f01-eye-ring-glow",
+      { opacity: 0.95 },
+      { opacity: GLOW_REST, duration: 0.25, ease: "expo.out", immediateRender: false },
+      HALF
+    );
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines[ID] = tl;
+  })();
+</script>
+</template>
