@@ -390,11 +390,17 @@ final class OverlayView: NSView {
     /// Deliberately NOT done in init: layers that never exist before practice
     /// can never flash at launch, whatever the render loop's timing does.
     private func ensureMockWindows() {
+        // Laid out in the CONTENT window's space (mockHost), not the HUD's:
+        // the HUD view follows the active display while the mock host stays
+        // on its birth screen, so on a multi-display Mac `bounds` can be the
+        // wrong size by the time practice starts and the windows would land
+        // off-layer, out of the drills' reach.
+        let host = mockHost.bounds.isEmpty ? bounds : mockHost.bounds
         let notes = MockWindowLayer(title: "Practice window", size: CGSize(width: 380, height: 250), tint: .systemTeal)
-        notes.center = CGPoint(x: bounds.width * 0.3, y: bounds.height * 0.55)
+        notes.center = CGPoint(x: host.width * 0.3, y: host.height * 0.55)
         notes.target = notes.center
         let browser = MockWindowLayer(title: "Scroll practice", size: CGSize(width: 420, height: 280), tint: .systemOrange)
-        browser.center = CGPoint(x: bounds.width * 0.68, y: bounds.height * 0.42)
+        browser.center = CGPoint(x: host.width * 0.68, y: host.height * 0.42)
         browser.target = browser.center
         browser.addScrollContent()
         mockWindows = [notes, browser]

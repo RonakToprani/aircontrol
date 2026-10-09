@@ -543,6 +543,10 @@ final class AppState: ObservableObject {
         if onboarding == nil {
             tourOpen = false
             pendingTourHandoff = false
+            // And retire any countdown still in flight: re-enabling within
+            // the 3s would otherwise let its stale timers put "Hand control
+            // in N…" / "You're live" on a HUD whose sandbox already lifted.
+            tourHandoffGeneration += 1
         }
     }
 
